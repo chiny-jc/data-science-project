@@ -3,12 +3,12 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-with open('train.json') as f:
+with open('data/train.json') as f:
     data = json.load(f)
 
 df = pd.DataFrame(data)
 
-df.describe()
+df_describe = df.describe()
 
 np.random.seed(123)
 df = df.sample(frac=1) # shuffle data

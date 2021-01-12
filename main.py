@@ -1,4 +1,5 @@
 import json
+import re
 
 import numpy as np
 import pandas as pd
@@ -45,6 +46,12 @@ sns.boxplot(df['interest_level'], y=df['bedrooms'], order=['low','medium','high'
 sns.histplot(data=df, x='price', bins=50)
 sns.boxplot(df['interest_level'], y=df['price'], order=['low','medium','high'])
 
+sns.histplot(data=df, x='longitude', bins=50)
+sns.boxplot(df['interest_level'], y=df['longitude'], order=['low','medium','high'])
+
+sns.histplot(data=df, x='latitude', bins=50)
+sns.boxplot(df['interest_level'], y=df['latitude'], order=['low','medium','high'])
+
 df_with_geolocation = df[['longitude','latitude','interest_level']][df['longitude'] != 0]
 sns.scatterplot(x=df_with_geolocation['longitude'], y=df_with_geolocation['latitude'], 
                 hue=df_with_geolocation['interest_level'], alpha=0.5)
@@ -88,6 +95,49 @@ one_hot_for_manager_ids = one_hot_encoder.fit_transform(pd.DataFrame(df['manager
 
 multilabel_binarizer = MultiLabelBinarizer()
 one_hot_for_features = multilabel_binarizer.fit_transform(df['features'])
+
+'''Transforming the display address column'''
+
+display_address_column = df['display_address']
+display_address_column_transformed = ( display_address_column
+                                       .apply(str.upper)
+                                       .apply(lambda x: x.replace('WEST','W'))
+                                       .apply(lambda x: x.replace('EAST','E'))
+                                       .apply(lambda x: x.replace('STREET','ST'))
+                                       .apply(lambda x: x.replace('AVENUE','AVE'))
+                                       .apply(lambda x: x.replace('.',''))
+                                       .apply(lambda x: x.replace(',',''))
+                                       .apply(lambda x: x.strip())
+                                       .apply(lambda x: re.sub('(?<=\d)[A-Z]{2}', '', x))
+                                       .apply(lambda x: x.replace('FIRST','1'))
+                                       .apply(lambda x: x.replace('SECOND','2'))
+                                       .apply(lambda x: x.replace('THIRD','3'))
+                                       .apply(lambda x: x.replace('FOURTH','4'))
+                                       .apply(lambda x: x.replace('FIFTH','5'))
+                                       .apply(lambda x: x.replace('SIXTH','6'))
+                                       .apply(lambda x: x.replace('SEVENTH','7'))
+                                       .apply(lambda x: x.replace('EIGHTH','8'))
+                                       .apply(lambda x: x.replace('EIGTH','8'))
+                                       .apply(lambda x: x.replace('NINTH','9'))
+                                       .apply(lambda x: x.replace('TENTH','10'))
+                                       .apply(lambda x: x.replace('ELEVENTH','11'))
+                                     )
+
+print(display_address_column_transformed.nunique())
+
+def regex_lookup(column, regex_pattern, match_only=True):
+    matches = []
+    idx = []
+    for i in range(len(column) - 1):
+        match = re.search(regex_pattern, column.iloc[i])
+        if match != None:
+            matches.append(match.group(0))
+            idx.append(i)
+    
+    if match_only:
+        return matches
+    else:
+        return column.iloc[idx]
 
 '''Splitting the dataset for modeling'''
 

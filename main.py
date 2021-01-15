@@ -47,10 +47,7 @@ print(len(all_unique_features))
 
 np.random.seed(123)
 df = df.sample(frac=1) # shuffle data
-df_dev, df_test = train_test_split(df, test_size=0.15)
-df_train, df_valid = train_test_split(df_dev, test_size=0.15)
-
-
-
+df_train, df_rest = train_test_split(df, test_size=0.3)
+df_test, df_val = train_test_split(df_rest, test_size=0.5)
 
 #test

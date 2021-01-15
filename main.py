@@ -59,6 +59,10 @@ print(len(all_unique_features))
 np.random.seed(123)
 df = df.sample(frac=1) # shuffle data
 
+df_train, df_rest = train_test_split(df, test_size=0.3)
+df_test, df_val = train_test_split(df_rest, test_size=0.5)
+
+
 '''Hyperparameter Tuning the Random Forest in Python'''
 print(df.columns)
 
@@ -126,6 +130,9 @@ print('Accurracy for train:',score)
 
 #OOB is the accuracy in trainnig test using oob samlpes
 print('OOB score',rf.oob_score_)
+
+
+
 
 
 

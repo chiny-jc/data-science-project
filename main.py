@@ -138,6 +138,30 @@ def regex_lookup(column, regex_pattern, match_only=True):
         return matches
     else:
         return column.iloc[idx]
+    
+# Convert target values into ordinal values 
+df['interest_level'] = df['interest_level'].apply(lambda x: 0 if x=='low' else 1 if x=='medium' else 2)
+
+# Check homogeneity of target values
+sns.countplot('interest_level', data=df)
+plt.title('Unbalanced Classes')
+
+# undersampling: reduce sample size for each class so that we have a balanced dataset
+interest_2 = len(df.loc[df["interest_level"]==2]) #class with fewest samples 
+
+shuffled_df = df.sample(frac=1,random_state=42)
+df_0_reduced = shuffled_df.loc[shuffled_df['interest_level'] == 0].sample(n=interest_2,random_state=42)
+df_1_reduced = shuffled_df.loc[shuffled_df['interest_level'] == 1].sample(n=interest_2,random_state=42)
+df_2 = shuffled_df.loc[shuffled_df['interest_level'] == 2]
+
+# Concatenate dataframes again
+df = pd.concat([df_0_reduced, df_1_reduced, df_2]) #balanced dataset
+
+#plot the dataset after the undersampling
+plt.figure(figsize=(8, 8))
+sns.countplot('interest_level', data=df)
+plt.title('Balanced Classes')
+plt.show()
 
 '''Splitting the dataset for modeling'''
 

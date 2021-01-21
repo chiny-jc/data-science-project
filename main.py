@@ -53,30 +53,6 @@ df_head = df.head()
 df_describe = df.describe()
 df_info = df.info()
 
-# Convert target values into ordinal values 
-df['interest_level'] = df['interest_level'].apply(lambda x: 0 if x=='low' else 1 if x=='medium' else 2)
-
-# Check homogeneity of target values
-sns.countplot('interest_level', data=df)
-plt.title('Unbalanced Classes')
-
-# undersampling: reduce sample size for each class so that we have a balanced dataset
-interest_2 = len(df.loc[df["interest_level"]==2]) #class with fewest samples 
-
-shuffled_df = df.sample(frac=1,random_state=42)
-df_0_reduced = shuffled_df.loc[shuffled_df['interest_level'] == 0].sample(n=interest_2,random_state=42)
-df_1_reduced = shuffled_df.loc[shuffled_df['interest_level'] == 1].sample(n=interest_2,random_state=42)
-df_2 = shuffled_df.loc[shuffled_df['interest_level'] == 2]
-
-# Concatenate dataframes again
-df = pd.concat([df_0_reduced, df_1_reduced, df_2]) #balanced dataset
-
-#plot the dataset after the undersampling
-plt.figure(figsize=(8, 8))
-sns.countplot('interest_level', data=df)
-plt.title('Balanced Classes')
-plt.show()
-
 print('Num. of Unique Display Addresses: {}'.format(df['display_address'].nunique()))
 print('Num. of Unique Manager IDs: {}'.format(df['manager_id'].nunique()))
 
@@ -85,26 +61,6 @@ df['features'].apply(lambda x: add_unique_elements(x, all_unique_features))
 print('Num. of Unique Features: {}'.format(len(all_unique_features)))
 
 ''' --------------------------------- FEATURE ENGINEERING --------------------------------- '''
-
-'''  ----- NUMERICAL VARIABLES ----- '''
-
-num_vars = ['bathrooms','bedrooms','latitude','longitude','price']
-df_num = df[num_vars].copy()
-
-df_num['total_rooms'] = df_num['bathrooms'] + df_num['bedrooms']
-df_num['price_per_room'] = df_num[['price','total_rooms']].apply(lambda x: x[0]/x[1] if x[1] != 0 else 0, axis=1)
-
-central_park_coordinates = (40.7799963,-73.970621)
-df_num['dist_to_central_park'] = df_num[['latitude','longitude']].apply(
-        lambda x: calculate_distance_between_coordinates(central_park_coordinates,(x[0],x[1])), axis=1)
-
-wall_street_coordinates = (40.7059692,-74.0099558)
-df_num['dist_to_wall_street'] = df_num[['latitude','longitude']].apply(
-        lambda x: calculate_distance_between_coordinates(wall_street_coordinates,(x[0],x[1])), axis=1)
-
-times_square_coordinates = (40.7567473,-73.9888876)
-df_num['dist_to_times_square'] = df_num[['latitude','longitude']].apply(
-        lambda x: calculate_distance_between_coordinates(times_square_coordinates,(x[0],x[1])), axis=1)
 
 '''  ----- CATEGORICAL VARIABLES ----- '''
 
@@ -136,10 +92,12 @@ display_address_column_transformed = ( display_address_column
                                        .apply(lambda x: x.replace('ELEVENTH','11'))
                                      )
 
-print(display_address_column_transformed.nunique())
+print("Num. of Unique Display Addresses after Transformation: {}".format(
+    display_address_column_transformed.nunique()))
 
 '''  ----- TEXT VARIABLES ----- '''
 
+df['length_description'] = df['description'].apply(lambda x: len(x))
 df['num_words_description'] = df['description'].apply(lambda x: len(x.split(" ")))
 df['num_features'] = df['features'].apply(len)
 
@@ -149,15 +107,39 @@ one_hot_for_features = multilabel_binarizer.fit_transform(df['features'])
 '''  ----- DATE VARIABLES ----- '''
 
 df['created'] = pd.to_datetime(df['created'])
-df['created_year'] = df['created'].dt.year      # ALL RECORDS ARE YEAR 2016
-df['created_month'] = df['created'].dt.month    # ALL RECORDS ARE BETWEEN APRIL AND JUNE
-df['created_day'] = df['created'].dt.day
+df['created_year'] = df['created'].dt.year
+df['created_month'] = df['created'].dt.month
+df['created_day_of_month'] = df['created'].dt.day
+df['created_day_of_week'] = df['created'].dt.dayofweek
+df['created_hour'] = df['created'].dt.hour
 
 '''  ----- IMAGE VARIABLES ----- '''
 
 df['num_photos'] = df['photos'].apply(len)
 
-'''  ----- ID VARIABLES ----- '''
+'''  ----- NUMERICAL VARIABLES ----- '''
+
+df['total_rooms'] = df['bathrooms'] + df['bedrooms']
+df['price_per_room'] = df[['price','total_rooms']].apply(lambda x: x[0]/x[1] if x[1] != 0 else 0, axis=1)
+df['price_per_bedroom'] = df[['price','bedrooms']].apply(lambda x: x[0]/x[1] if x[1] != 0 else 0, axis=1)
+df['price_per_bathroom'] = df[['price','bathrooms']].apply(lambda x: x[0]/x[1] if x[1] != 0 else 0, axis=1)
+
+df['price_per_word_description'] = df[['price','num_words_description']].apply(lambda x: x[0]/x[1] if x[1] != 0 else 0, axis=1)
+df['price_per_length_description'] = df[['price','length_description']].apply(lambda x: x[0]/x[1] if x[1] != 0 else 0, axis=1)
+df['price_per_feature'] = df[['price','num_features']].apply(lambda x: x[0]/x[1] if x[1] != 0 else 0, axis=1)
+df['price_per_photo'] = df[['price','num_photos']].apply(lambda x: x[0]/x[1] if x[1] != 0 else 0, axis=1)
+
+central_park_coordinates = (40.7799963,-73.970621)
+df['distance_to_central_park'] = df[['latitude','longitude']].apply(
+        lambda x: calculate_distance_between_coordinates(central_park_coordinates,(x[0],x[1])), axis=1)
+
+wall_street_coordinates = (40.7059692,-74.0099558)
+df['distance_to_wall_street'] = df[['latitude','longitude']].apply(
+        lambda x: calculate_distance_between_coordinates(wall_street_coordinates,(x[0],x[1])), axis=1)
+
+times_square_coordinates = (40.7567473,-73.9888876)
+df['distance_to_times_square'] = df[['latitude','longitude']].apply(
+        lambda x: calculate_distance_between_coordinates(times_square_coordinates,(x[0],x[1])), axis=1)
 
 ''' ------------------------------------ VISUAL EDA --------------------------------------- '''
 '''
@@ -203,6 +185,30 @@ sns.boxplot(df['interest_level'], y=df['created_day'], order=['low','medium','hi
 '''
     
 ''' ------------------------------------ DATA MODELING ------------------------------------ '''
+
+# Convert target values into ordinal values 
+df['interest_level'] = df['interest_level'].apply(lambda x: 0 if x=='low' else 1 if x=='medium' else 2)
+
+# Check homogeneity of target values
+sns.countplot('interest_level', data=df)
+plt.title('Unbalanced Classes')
+
+# undersampling: reduce sample size for each class so that we have a balanced dataset
+interest_2 = len(df.loc[df["interest_level"]==2]) #class with fewest samples 
+
+shuffled_df = df.sample(frac=1,random_state=42)
+df_0_reduced = shuffled_df.loc[shuffled_df['interest_level'] == 0].sample(n=interest_2,random_state=42)
+df_1_reduced = shuffled_df.loc[shuffled_df['interest_level'] == 1].sample(n=interest_2,random_state=42)
+df_2 = shuffled_df.loc[shuffled_df['interest_level'] == 2]
+
+# Concatenate dataframes again
+df = pd.concat([df_0_reduced, df_1_reduced, df_2]) #balanced dataset
+
+#plot the dataset after the undersampling
+plt.figure(figsize=(8, 8))
+sns.countplot('interest_level', data=df)
+plt.title('Balanced Classes')
+plt.show()
 
 np.random.seed(123)
 df = df.sample(frac=1) # shuffle data

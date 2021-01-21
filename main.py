@@ -32,6 +32,13 @@ def regex_lookup(column, regex_pattern, match_only=True):
         return matches
     else:
         return column.iloc[idx]
+    
+def calculate_distance_between_coordinates(first_coordinates, second_coordinates):
+    meters_per_coordinate_degree = 111.139
+    latitude_difference_in_km = abs(first_coordinates[0] - second_coordinates[0]) * meters_per_coordinate_degree
+    longitude_difference_in_km = abs(first_coordinates[1] - second_coordinates[1]) * meters_per_coordinate_degree
+    linear_distance = np.sqrt(latitude_difference_in_km ** 2 + longitude_difference_in_km ** 2)
+    return linear_distance
 
 ''' ---------------------------------- READING THE FILE ----------------------------------- '''
 
@@ -80,6 +87,24 @@ print('Num. of Unique Features: {}'.format(len(all_unique_features)))
 ''' --------------------------------- FEATURE ENGINEERING --------------------------------- '''
 
 '''  ----- NUMERICAL VARIABLES ----- '''
+
+num_vars = ['bathrooms','bedrooms','latitude','longitude','price']
+df_num = df[num_vars].copy()
+
+df_num['total_rooms'] = df_num['bathrooms'] + df_num['bedrooms']
+df_num['price_per_room'] = df_num[['price','total_rooms']].apply(lambda x: x[0]/x[1] if x[1] != 0 else 0, axis=1)
+
+central_park_coordinates = (40.7799963,-73.970621)
+df_num['dist_to_central_park'] = df_num[['latitude','longitude']].apply(
+        lambda x: calculate_distance_between_coordinates(central_park_coordinates,(x[0],x[1])), axis=1)
+
+wall_street_coordinates = (40.7059692,-74.0099558)
+df_num['dist_to_wall_street'] = df_num[['latitude','longitude']].apply(
+        lambda x: calculate_distance_between_coordinates(wall_street_coordinates,(x[0],x[1])), axis=1)
+
+times_square_coordinates = (40.7567473,-73.9888876)
+df_num['dist_to_times_square'] = df_num[['latitude','longitude']].apply(
+        lambda x: calculate_distance_between_coordinates(times_square_coordinates,(x[0],x[1])), axis=1)
 
 '''  ----- CATEGORICAL VARIABLES ----- '''
 
@@ -135,7 +160,7 @@ df['num_photos'] = df['photos'].apply(len)
 '''  ----- ID VARIABLES ----- '''
 
 ''' ------------------------------------ VISUAL EDA --------------------------------------- '''
-
+'''
 num_unique_bathroom_values = df['bathrooms'].nunique()
 sns.histplot(data=df, x='bathrooms', bins=num_unique_bathroom_values)
 sns.boxplot(df['interest_level'], y=df['bathrooms'], order=['low','medium','high'])
@@ -175,6 +200,7 @@ print(min(df['created_day']), max(df['created_day']))
 print(df['created_day'].unique())
 sns.histplot(data=df, x='created_day', bins=31)
 sns.boxplot(df['interest_level'], y=df['created_day'], order=['low','medium','high'])
+'''
     
 ''' ------------------------------------ DATA MODELING ------------------------------------ '''
 

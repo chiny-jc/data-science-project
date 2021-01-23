@@ -1,6 +1,24 @@
 ''' -------------------------------------- FUNCTIONS -------------------------------------- '''
 
-import re 
+import json
+import re
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import string 
+
+from re import search 
+
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import log_loss
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
+from sklearn import preprocessing
+from sklearn.preprocessing import OneHotEncoder, MultiLabelBinarizer
+
+
 def add_unique_elements(list_to_iterate, set_to_add):
     for element in list_to_iterate:
         set_to_add.add(element)

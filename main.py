@@ -100,8 +100,8 @@ for address in addresses:
         
     df = df.drop(df.index[address_delete])
 
-LBL = preprocessing.LabelEncoder()
-
+LBL = LabelEncoder()
+cat_vars = ['building_id','manager_id','display_address','street_address']
 LE_vars=[]
 for cat_var in cat_vars:
     print ("Label Encoding %s" % (cat_var))

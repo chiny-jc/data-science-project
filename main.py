@@ -13,6 +13,7 @@ from re import search
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import log_loss
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.preprocessing import OneHotEncoder, MultiLabelBinarizer
 
 import functions
@@ -134,6 +135,16 @@ df['num_features'] = df['features'].apply(len)
 #multilabel_binarizer = MultiLabelBinarizer()
 #one_hot_for_features = multilabel_binarizer.fit_transform(df['features'])
 
+''' ----- BUG ---------
+v = CountVectorizer(stop_words='english', max_features=100)
+x = v.fit_transform(df['features']\
+                                     .apply(lambda x: " ".join(["_".join(i.split(" ")) for i in x])))
+
+df1 = pd.DataFrame(x.toarray(), columns=v.get_feature_names())
+df.drop('features', axis=1, inplace=True)
+res = pd.concat([df, df1], axis=1)
+'''
+
 '''  ----- DATE VARIABLES ----- '''
 
 df['created'] = pd.to_datetime(df['created'])
@@ -174,6 +185,22 @@ df['distance_to_wall_street'] = df[['latitude','longitude']].apply(
 times_square_coordinates = (40.7567473,-73.9888876)
 df['distance_to_times_square'] = df[['latitude','longitude']].apply(
         lambda x: functions.calculate_distance_between_coordinates(times_square_coordinates,(x[0],x[1])), axis=1)
+
+
+''' ------------------------------------ Correlation of Features and Target --------------------------------------- '''
+
+# Convert target values into ordinal values 
+df['interest_level'] = df['interest_level'].apply(lambda x: 0 if x=='low' else 1 if x=='medium' else 2)
+
+df_corr = df.corr()
+df_corr_abs = np.abs(df_corr['interest_level'])
+
+df_corr_abs_sort = df_corr_abs.sort_values(ascending = False)
+print(df_corr_abs_sort)
+
+sns.set(rc={'figure.figsize':(15.7,10.27)})
+sns.heatmap(df.corr())
+
 
 ''' ------------------------------------ VISUAL EDA --------------------------------------- '''
 '''
@@ -219,9 +246,6 @@ sns.boxplot(df['interest_level'], y=df['created_day'], order=['low','medium','hi
 '''
     
 ''' ------------------------------------ DATA MODELING ------------------------------------ '''
-
-# Convert target values into ordinal values 
-df['interest_level'] = df['interest_level'].apply(lambda x: 0 if x=='low' else 1 if x=='medium' else 2)
 
 # Check homogeneity of target values
 sns.countplot('interest_level', data=df)

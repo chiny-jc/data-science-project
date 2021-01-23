@@ -40,6 +40,12 @@ all_unique_features = set()
 df['features'].apply(lambda x: functions.add_unique_elements(x, all_unique_features))
 print('Num. of Unique Features: {}'.format(len(all_unique_features)))
 
+
+df['interest_level'] = df['interest_level'].apply(lambda x: 0 if x=='low' else 1 if x=='medium' else 2)
+# Check homogeneity of target values
+sns.countplot('interest_level', data=df)
+plt.title('Unbalanced Classes')
+
 ''' --------------------------------- FEATURE ENGINEERING --------------------------------- '''
 
 '''  ----- CATEGORICAL VARIABLES ----- '''
@@ -77,7 +83,7 @@ for address in addresses:
                                            .apply(lambda x: x.replace('ELEVENTH','11'))
                                          )
 
-    print("Num. of Unique Display Addresses after Transformation: {}".format(
+    print("Num. of Unique Addresses after Transformation: {}".format(
         address_column_transformed.nunique()))
 
     df[address] = address_column_transformed 
@@ -90,25 +96,21 @@ for address in addresses:
             address_delete.append(i)
         
     df = df.drop(df.index[address_delete])
+  
+display=df["display_address"].value_counts()
+manager_id=df["manager_id"].value_counts()
+building_id=df["building_id"].value_counts()
+street=df["street_address"].value_counts()
 
-LBL = preprocessing.LabelEncoder()
-cat_vars = ['building_id','manager_id','display_address','street_address']
-LE_vars=[]
-for cat_var in cat_vars:
-    print ("Label Encoding %s" % (cat_var))
-    df[cat_var]=LBL.fit_transform(df[cat_var])
-    
-    
-df['interest_level'] = df['interest_level'].apply(lambda x: 0 if x=='low' else 1 if x=='medium' else 2)
+df["display_count"]=df["display_address"].apply(lambda x:display[x])
+df["manager_count"]=df["manager_id"].apply(lambda x:manager_id[x])  
+df["building_count"]=df["building_id"].apply(lambda x:building_id[x])
+df["street_count"]=df["street_address"].apply(lambda x:street[x])
 
 price_by_building = df.groupby('building_id')['price'].agg([np.min,np.max,np.mean]).reset_index()
 price_by_building.columns = ['building_id','min_price_by_building',
                             'max_price_by_building','mean_price_by_building']
 df = pd.merge(df,price_by_building, how='left',on='building_id')
-
-#since we have 3481 unique values, I would not do OHE
-#one_hot_encoder = OneHotEncoder(sparse=False)
-#one_hot_for_manager_ids = one_hot_encoder.fit_transform(pd.DataFrame(df['manager_id']))
 
 
 '''  ----- TEXT VARIABLES ----- '''
@@ -135,18 +137,13 @@ df['num_words_description'] = df['description'].apply(lambda x: len(x.split(" ")
 
 df['num_features'] = df['features'].apply(len)
 
-#multilabel_binarizer = MultiLabelBinarizer()
-#one_hot_for_features = multilabel_binarizer.fit_transform(df['features'])
-
-''' ----- BUG ---------
 v = CountVectorizer(stop_words='english', max_features=100)
 x = v.fit_transform(df['features']\
                                      .apply(lambda x: " ".join(["_".join(i.split(" ")) for i in x])))
 
 df1 = pd.DataFrame(x.toarray(), columns=v.get_feature_names())
 df.drop('features', axis=1, inplace=True)
-res = pd.concat([df, df1], axis=1)
-'''
+res = df.join(df1.set_index(df.index))
 
 '''  ----- DATE VARIABLES ----- '''
 
@@ -193,7 +190,6 @@ df['distance_to_times_square'] = df[['latitude','longitude']].apply(
 ''' ------------------------------------ Correlation of Features and Target --------------------------------------- '''
 
 # Convert target values into ordinal values 
-df['interest_level'] = df['interest_level'].apply(lambda x: 0 if x=='low' else 1 if x=='medium' else 2)
 
 df_corr = df.corr()
 df_corr_abs = np.abs(df_corr['interest_level'])
@@ -250,11 +246,7 @@ sns.boxplot(df['interest_level'], y=df['created_day'], order=['low','medium','hi
     
 ''' ------------------------------------ DATA MODELING ------------------------------------ '''
 
-# Check homogeneity of target values
-sns.countplot('interest_level', data=df)
-plt.title('Unbalanced Classes')
 
-'''
 # undersampling: reduce sample size for each class so that we have a balanced dataset
 interest_2 = len(df.loc[df["interest_level"]==2]) #class with fewest samples 
 print(interest_2)
@@ -271,7 +263,7 @@ plt.figure(figsize=(8, 8))
 sns.countplot('interest_level', data=df)
 plt.title('Balanced Classes')
 plt.show()
-'''
+
 np.random.seed(123)
 df = df.sample(frac=1) # shuffle data
 df_dev, df_test = train_test_split(df, test_size=0.15)

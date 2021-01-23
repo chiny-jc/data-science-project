@@ -44,17 +44,6 @@ print('Num. of Unique Features: {}'.format(len(all_unique_features)))
 
 '''  ----- CATEGORICAL VARIABLES ----- '''
 
-df['interest_level'] = df['interest_level'].apply(lambda x: 0 if x=='low' else 1 if x=='medium' else 2)
-
-price_by_building = df.groupby('building_id')['price'].agg([np.min,np.max,np.mean]).reset_index()
-price_by_building.columns = ['building_id','min_price_by_building',
-                            'max_price_by_building','mean_price_by_building']
-df = pd.merge(df,price_by_building, how='left',on='building_id')
-
-#since we have 3481 unique values, I would not do OHE
-#one_hot_encoder = OneHotEncoder(sparse=False)
-#one_hot_for_manager_ids = one_hot_encoder.fit_transform(pd.DataFrame(df['manager_id']))
-
 addresses = ['display_address', 'street_address']
 
 for address in addresses:
@@ -109,6 +98,18 @@ for cat_var in cat_vars:
     print ("Label Encoding %s" % (cat_var))
     df[cat_var]=LBL.fit_transform(df[cat_var])
     
+    
+df['interest_level'] = df['interest_level'].apply(lambda x: 0 if x=='low' else 1 if x=='medium' else 2)
+
+price_by_building = df.groupby('building_id')['price'].agg([np.min,np.max,np.mean]).reset_index()
+price_by_building.columns = ['building_id','min_price_by_building',
+                            'max_price_by_building','mean_price_by_building']
+df = pd.merge(df,price_by_building, how='left',on='building_id')
+
+#since we have 3481 unique values, I would not do OHE
+#one_hot_encoder = OneHotEncoder(sparse=False)
+#one_hot_for_manager_ids = one_hot_encoder.fit_transform(pd.DataFrame(df['manager_id']))
+
 
 '''  ----- TEXT VARIABLES ----- '''
 
@@ -159,8 +160,8 @@ df['created_hour'] = df['created'].dt.hour
 '''  ----- IMAGE VARIABLES ----- '''
 
 df['num_photos'] = df['photos'].apply(len)
-df['photos_per_bedroom'] = df[['num_of_photos','bedrooms']].apply(lambda x: x[0]/x[1] if x[1]!=0 else 0, axis=1)
-df['photos_per_bathroom'] = df[['num_of_photos','bathrooms']].apply(lambda x: x[0]/x[1] if x[1]!=0 else 0, axis=1)
+df['photos_per_bedroom'] = df[['num_photos','bedrooms']].apply(lambda x: x[0]/x[1] if x[1]!=0 else 0, axis=1)
+df['photos_per_bathroom'] = df[['num_photos','bathrooms']].apply(lambda x: x[0]/x[1] if x[1]!=0 else 0, axis=1)
 
 
 
@@ -253,9 +254,10 @@ sns.boxplot(df['interest_level'], y=df['created_day'], order=['low','medium','hi
 sns.countplot('interest_level', data=df)
 plt.title('Unbalanced Classes')
 
+'''
 # undersampling: reduce sample size for each class so that we have a balanced dataset
 interest_2 = len(df.loc[df["interest_level"]==2]) #class with fewest samples 
-
+print(interest_2)
 shuffled_df = df.sample(frac=1,random_state=42)
 df_0_reduced = shuffled_df.loc[shuffled_df['interest_level'] == 0].sample(n=interest_2,random_state=42)
 df_1_reduced = shuffled_df.loc[shuffled_df['interest_level'] == 1].sample(n=interest_2,random_state=42)
@@ -269,7 +271,7 @@ plt.figure(figsize=(8, 8))
 sns.countplot('interest_level', data=df)
 plt.title('Balanced Classes')
 plt.show()
-
+'''
 np.random.seed(123)
 df = df.sample(frac=1) # shuffle data
 df_dev, df_test = train_test_split(df, test_size=0.15)

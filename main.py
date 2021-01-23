@@ -1,3 +1,4 @@
+''' ------------------------------ IMPORTING THE LIBRARIES -------------------------------- '''
 
 import json
 import re
@@ -7,14 +8,18 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from sklearn.model_selection import train_test_split, RandomizedSearchCV, GridSearchCV
+from re import search 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import log_loss
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.preprocessing import OneHotEncoder, MultiLabelBinarizer
 from sklearn.preprocessing import LabelEncoder
 from sklearn.pipeline import Pipeline
 
-'''Reading the file'''
+import functions
+
+''' ---------------------------------- READING THE FILE ----------------------------------- '''
 
 with open('data/train.json') as f:
     data = json.load(f)
@@ -23,39 +28,190 @@ with open('data/train.json') as f:
 
 df = pd.DataFrame(data)
 
-'''Exploratory Data Analysis'''
+''' ------------------------------- EXPLORATORY DATA ANALYSIS ----------------------------- '''
 
 df_head = df.head()
 df_describe = df.describe()
 df_info = df.info()
 
-df['num_photos'] = df['photos'].apply(len)
-df['num_features'] = df['features'].apply(len)
-df['num_words_description'] = df['description'].apply(lambda x: len(x.split(" ")))
+print('Num. of Unique Display Addresses: {}'.format(df['display_address'].nunique()))
+print('Num. of Unique Manager IDs: {}'.format(df['manager_id'].nunique()))
 
-df['created'] = pd.to_datetime(df['created'])
-df['created_year'] = df['created'].dt.year
-df['created_month'] = df['created'].dt.month
-df['created_day'] = df['created'].dt.day
+all_unique_features = set()    
+df['features'].apply(lambda x: functions.add_unique_elements(x, all_unique_features))
+print('Num. of Unique Features: {}'.format(len(all_unique_features)))
 
+''' --------------------------------- FEATURE ENGINEERING --------------------------------- '''
+
+'''  ----- CATEGORICAL VARIABLES ----- '''
+
+df['interest_level'] = df['interest_level'].apply(lambda x: 0 if x=='low' else 1 if x=='medium' else 2)
+
+price_by_building = df.groupby('building_id')['price'].agg([np.min,np.max,np.mean]).reset_index()
+price_by_building.columns = ['building_id','min_price_by_building',
+                            'max_price_by_building','mean_price_by_building']
+df = pd.merge(df,price_by_building, how='left',on='building_id')
+
+#since we have 3481 unique values, I would not do OHE
+#one_hot_encoder = OneHotEncoder(sparse=False)
+#one_hot_for_manager_ids = one_hot_encoder.fit_transform(pd.DataFrame(df['manager_id']))
+
+addresses = ['display_address', 'street_address']
+
+for address in addresses:
+    address_column = df[address]
+    address_column_transformed = ( address_column
+                                           .apply(str.upper)
+                                           .apply(lambda x: x.replace('WEST','W'))
+                                           .apply(lambda x: x.replace('EAST','E'))
+                                           .apply(lambda x: x.replace('STREET','ST'))
+                                           .apply(lambda x: x.replace('AVENUE','AVE'))
+                                           .apply(lambda x: x.replace('BOULEVARD','BLVD'))
+                                           .apply(lambda x: x.replace('.',''))
+                                           .apply(lambda x: x.replace(',',''))
+                                           .apply(lambda x: x.replace('&',''))
+                                           .apply(lambda x: x.replace('(',''))
+                                           .apply(lambda x: x.replace(')',''))
+                                           .apply(lambda x: x.strip())
+                                           #.apply(lambda x: re.sub('(?<=\d)[A-Z]{2}', '', x))
+                                           .apply(lambda x: re.sub('[^A-Za-z0-9]+ ', '', x)) #remove all special characters and punctuaction
+                                           .apply(lambda x: x.replace('FIRST','1'))
+                                           .apply(lambda x: x.replace('SECOND','2'))
+                                           .apply(lambda x: x.replace('THIRD','3'))
+                                           .apply(lambda x: x.replace('FOURTH','4'))
+                                           .apply(lambda x: x.replace('FIFTH','5'))
+                                           .apply(lambda x: x.replace('SIXTH','6'))
+                                           .apply(lambda x: x.replace('SEVENTH','7'))
+                                           .apply(lambda x: x.replace('EIGHTH','8'))
+                                           .apply(lambda x: x.replace('EIGTH','8'))
+                                           .apply(lambda x: x.replace('NINTH','9'))
+                                           .apply(lambda x: x.replace('TENTH','10'))
+                                           .apply(lambda x: x.replace('ELEVENTH','11'))
+                                         )
+
+    print("Num. of Unique Display Addresses after Transformation: {}".format(
+        address_column_transformed.nunique()))
+
+    df[address] = address_column_transformed 
+
+    ''' delete rows that contain descriptions instead of actual addresses '''
+    address_delete = [] 
+    for i in range(len(df)):
+        address_val = df[address][i]
+        if search('!', address_val):
+            address_delete.append(i)
+        
+    df = df.drop(df.index[address_delete])
+
+LBL = preprocessing.LabelEncoder()
+
+LE_vars=[]
+for cat_var in cat_vars:
+    print ("Label Encoding %s" % (cat_var))
+    df[cat_var]=LBL.fit_transform(df[cat_var])
 
 ord_enc = LabelEncoder()
 df["manager_id_label"] = ord_enc.fit_transform(df[["manager_id"]])
 df[["manager_id_label", "manager_id"]].head()
 
-
-
-
 print(df['display_address'].nunique())
 print(df['manager_id'].nunique())
 print(df['interest_level'].nunique())
 
+'''  ----- TEXT VARIABLES ----- '''
+
+# Studies have shown that titles with excessive all caps and special characters give renters the impression 
+# that the listing is fraudulent – i.e. BEAUTIFUL***APARTMENT***CHELSEA.
+df['num_of_#']=df.description.apply(lambda x:x.count('#'))
+df['num_of_!']=df.description.apply(lambda x:x.count('!'))
+df['num_of_$']=df.description.apply(lambda x:x.count('$'))
+df['num_of_*']=df.description.apply(lambda x:x.count('*'))
+df['num_of_>']=df.description.apply(lambda x:x.count('>'))
+
+df['has_phone'] = df['description'].apply(lambda x:re.sub('['+string.punctuation+']', '', x).split())\
+        .apply(lambda x: [s for s in x if s.isdigit()])\
+        .apply(lambda x: len([s for s in x if len(str(s))==10]))\
+        .apply(lambda x: 1 if x>0 else 0)
+df['has_email'] = df['description'].apply(lambda x: 1 if '@renthop.com' in x else 0)
+
+display_address_column = df['description']
+df['description'] = [functions.text_cleaner(x) for x in display_address_column]
+
+df['length_description'] = df['description'].apply(lambda x: len(x))
+df['num_words_description'] = df['description'].apply(lambda x: len(x.split(" ")))
+
+df['num_features'] = df['features'].apply(len)
+
+#multilabel_binarizer = MultiLabelBinarizer()
+#one_hot_for_features = multilabel_binarizer.fit_transform(df['features'])
+
+''' ----- BUG ---------
+v = CountVectorizer(stop_words='english', max_features=100)
+x = v.fit_transform(df['features']\
+                                     .apply(lambda x: " ".join(["_".join(i.split(" ")) for i in x])))
+
+df1 = pd.DataFrame(x.toarray(), columns=v.get_feature_names())
+df.drop('features', axis=1, inplace=True)
+res = pd.concat([df, df1], axis=1)
+'''
+
+'''  ----- DATE VARIABLES ----- '''
+
+df['created'] = pd.to_datetime(df['created'])
 df['created_year'] = df['created'].dt.year      # ALL RECORDS ARE YEAR 2016
 df['created_month'] = df['created'].dt.month    # ALL RECORDS ARE BETWEEN APRIL AND JUNE
-df['created_day'] = df['created'].dt.day
+df['created_day_of_month'] = df['created'].dt.day
+df['created_day_of_week'] = df['created'].dt.dayofweek
+df['created_hour'] = df['created'].dt.hour
+
+'''  ----- IMAGE VARIABLES ----- '''
+
+df['num_photos'] = df['photos'].apply(len)
+df['photos_per_bedroom'] = df[['num_of_photos','bedrooms']].apply(lambda x: x[0]/x[1] if x[1]!=0 else 0, axis=1)
+df['photos_per_bathroom'] = df[['num_of_photos','bathrooms']].apply(lambda x: x[0]/x[1] if x[1]!=0 else 0, axis=1)
+
+'''  ----- NUMERICAL VARIABLES ----- '''
+
+df['total_rooms'] = df['bathrooms'] + df['bedrooms']
+df['price_per_room'] = df[['price','total_rooms']].apply(lambda x: x[0]/x[1] if x[1] != 0 else 0, axis=1)
+df['price_per_bedroom'] = df[['price','bedrooms']].apply(lambda x: x[0]/x[1] if x[1] != 0 else 0, axis=1)
+df['price_per_bathroom'] = df[['price','bathrooms']].apply(lambda x: x[0]/x[1] if x[1] != 0 else 0, axis=1)
+
+df['price_per_word_description'] = df[['price','num_words_description']].apply(lambda x: x[0]/x[1] if x[1] != 0 else 0, axis=1)
+df['price_per_length_description'] = df[['price','length_description']].apply(lambda x: x[0]/x[1] if x[1] != 0 else 0, axis=1)
+df['price_per_feature'] = df[['price','num_features']].apply(lambda x: x[0]/x[1] if x[1] != 0 else 0, axis=1)
+df['price_per_photo'] = df[['price','num_photos']].apply(lambda x: x[0]/x[1] if x[1] != 0 else 0, axis=1)
+
+central_park_coordinates = (40.7799963,-73.970621)
+df['distance_to_central_park'] = df[['latitude','longitude']].apply(
+        lambda x: functions.calculate_distance_between_coordinates(central_park_coordinates,(x[0],x[1])), axis=1)
+
+wall_street_coordinates = (40.7059692,-74.0099558)
+df['distance_to_wall_street'] = df[['latitude','longitude']].apply(
+        lambda x: functions.calculate_distance_between_coordinates(wall_street_coordinates,(x[0],x[1])), axis=1)
+
+times_square_coordinates = (40.7567473,-73.9888876)
+df['distance_to_times_square'] = df[['latitude','longitude']].apply(
+        lambda x: functions.calculate_distance_between_coordinates(times_square_coordinates,(x[0],x[1])), axis=1)
+
+
+''' ------------------------------------ Correlation of Features and Target --------------------------------------- '''
+
+# Convert target values into ordinal values 
+df['interest_level'] = df['interest_level'].apply(lambda x: 0 if x=='low' else 1 if x=='medium' else 2)
+
+df_corr = df.corr()
+df_corr_abs = np.abs(df_corr['interest_level'])
+
+df_corr_abs_sort = df_corr_abs.sort_values(ascending = False)
+print(df_corr_abs_sort)
+
+sns.set(rc={'figure.figsize':(15.7,10.27)})
+sns.heatmap(df.corr())
+
 
 ''' ------------------------------------ VISUAL EDA --------------------------------------- '''
-
+'''
 num_unique_bathroom_values = df['bathrooms'].nunique()
 sns.histplot(data=df, x='bathrooms', bins=num_unique_bathroom_values)
 sns.boxplot(df['interest_level'], y=df['bathrooms'], order=['low','medium','high'])
@@ -95,19 +251,8 @@ print(min(df['created_day']), max(df['created_day']))
 print(df['created_day'].unique())
 sns.histplot(data=df, x='created_day', bins=31)
 sns.boxplot(df['interest_level'], y=df['created_day'], order=['low','medium','high'])
+'''
 
-''' --------------------------------------------------------------------------------------- '''
-
-print('Num. of Unique Display Addresses: {}'.format(df['display_address'].nunique()))
-print('Num. of Unique Manager IDs: {}'.format(df['manager_id'].nunique()))
-print('Num. of Unique Interest Levels: {}'.format(df['interest_level'].nunique()))
-
-all_unique_features = set()
-
-def add_unique_elements(list_to_iterate, set_to_add):
-    for element in list_to_iterate:
-        set_to_add.add(element)
-    
 df['features'].apply(lambda x: add_unique_elements(x, all_unique_features))
 print(len(all_unique_features))
 print('Num. of Unique Features: {}'.format(len(all_unique_features)))
@@ -117,52 +262,11 @@ one_hot_for_manager_ids = one_hot_encoder.fit_transform(pd.DataFrame(df['manager
 
 multilabel_binarizer = MultiLabelBinarizer()
 one_hot_for_features = multilabel_binarizer.fit_transform(df['features'])
-
-'''Transforming the display address column'''
-
-display_address_column = df['display_address']
-display_address_column_transformed = ( display_address_column
-                                       .apply(str.upper)
-                                       .apply(lambda x: x.replace('WEST','W'))
-                                       .apply(lambda x: x.replace('EAST','E'))
-                                       .apply(lambda x: x.replace('STREET','ST'))
-                                       .apply(lambda x: x.replace('AVENUE','AVE'))
-                                       .apply(lambda x: x.replace('.',''))
-                                       .apply(lambda x: x.replace(',',''))
-                                       .apply(lambda x: x.strip())
-                                       .apply(lambda x: re.sub('(?<=\d)[A-Z]{2}', '', x))
-                                       .apply(lambda x: x.replace('FIRST','1'))
-                                       .apply(lambda x: x.replace('SECOND','2'))
-                                       .apply(lambda x: x.replace('THIRD','3'))
-                                       .apply(lambda x: x.replace('FOURTH','4'))
-                                       .apply(lambda x: x.replace('FIFTH','5'))
-                                       .apply(lambda x: x.replace('SIXTH','6'))
-                                       .apply(lambda x: x.replace('SEVENTH','7'))
-                                       .apply(lambda x: x.replace('EIGHTH','8'))
-                                       .apply(lambda x: x.replace('EIGTH','8'))
-                                       .apply(lambda x: x.replace('NINTH','9'))
-                                       .apply(lambda x: x.replace('TENTH','10'))
-                                       .apply(lambda x: x.replace('ELEVENTH','11'))
-                                     )
-
-print(display_address_column_transformed.nunique())
-
-def regex_lookup(column, regex_pattern, match_only=True):
-    matches = []
-    idx = []
-    for i in range(len(column) - 1):
-        match = re.search(regex_pattern, column.iloc[i])
-        if match != None:
-            matches.append(match.group(0))
-            idx.append(i)
-    
-    if match_only:
-        return matches
-    else:
-        return column.iloc[idx]
     
 # Convert target values into ordinal values 
 df['interest_level'] = df['interest_level'].apply(lambda x: 0 if x=='low' else 1 if x=='medium' else 2)
+
+''' ------------------------------------ DATA MODELING ------------------------------------ '''
 
 # Check homogeneity of target values
 sns.countplot('interest_level', data=df)
@@ -184,8 +288,6 @@ plt.figure(figsize=(8, 8))
 sns.countplot('interest_level', data=df)
 plt.title('Balanced Classes')
 plt.show()
-
-'''Splitting the dataset for modeling'''
 
 np.random.seed(123)
 df = df.sample(frac=1) # shuffle data

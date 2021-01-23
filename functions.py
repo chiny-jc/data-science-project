@@ -1,5 +1,6 @@
 ''' -------------------------------------- FUNCTIONS -------------------------------------- '''
 
+import re 
 def add_unique_elements(list_to_iterate, set_to_add):
     for element in list_to_iterate:
         set_to_add.add(element)

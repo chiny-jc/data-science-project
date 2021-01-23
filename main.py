@@ -49,7 +49,7 @@ df[["manager_id_label", "manager_id"]].head()
 print(df['display_address'].nunique())
 print(df['manager_id'].nunique())
 print(df['interest_level'].nunique())
-=======
+
 df['created_year'] = df['created'].dt.year      # ALL RECORDS ARE YEAR 2016
 df['created_month'] = df['created'].dt.month    # ALL RECORDS ARE BETWEEN APRIL AND JUNE
 df['created_day'] = df['created'].dt.day
@@ -110,7 +110,6 @@ def add_unique_elements(list_to_iterate, set_to_add):
     
 df['features'].apply(lambda x: add_unique_elements(x, all_unique_features))
 print(len(all_unique_features))
-=======
 print('Num. of Unique Features: {}'.format(len(all_unique_features)))
 
 one_hot_encoder = OneHotEncoder(sparse=False)

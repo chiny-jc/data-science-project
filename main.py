@@ -6,17 +6,20 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, RandomizedSearchCV, GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import log_loss
 from sklearn.preprocessing import OneHotEncoder, MultiLabelBinarizer
 from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import RandomizedSearchCV
+from sklearn.pipeline import Pipeline
 
 '''Reading the file'''
 
 with open('data/train.json') as f:
     data = json.load(f)
+#df = pd.read_json('data/train.json') '''the with statement doesn't work for me, hence I choose to import my data this way.'''
+#df.head()
 
 df = pd.DataFrame(data)
 
@@ -263,3 +266,36 @@ print('Accurracy for train:',score)
 #OOB is the accuracy in trainnig test using oob samlpes
 print('OOB score',rf.oob_score_)
 
+'''Choosing the best model'''
+#Defining model parameters from the tuned parameter
+model_params = {
+    'random_forest': {
+        'model': RandomForestClassifier(),
+        'params': {
+            'n_estimators': [100, 600, 1100]
+        }
+    },
+    
+    'decision_tree': {
+        'model': DecisionTreeClassifier(),
+        'params': {
+            'max_depth': [10, 50, 80]
+        }
+    }
+    
+}
+
+#Loop over both decision tree and random forest to determine the best model for the given dataset
+scores = []
+
+for model_name, mp in model_params.items():
+    clf = GridSearchCV(mp['model'], mp['params'], cv=5)
+    clf.fit(X, y)
+    scores.append({
+        'model': model_name,
+        'best_score': clf.best_score_,
+        'best_params': clf.best_params_
+    })
+    
+best_model = pd.DataFrame(scores, columns= ['model','best_score','best_params'])
+print(best_model)

@@ -1,0 +1,5 @@
+# Removing all unnecessary folders and files
+
+__pycache__
+
+.DS_Store

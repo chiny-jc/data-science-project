@@ -1,4 +1,5 @@
 ''' ------------------------------ IMPORTING THE LIBRARIES -------------------------------- '''
+import string
 
 import json
 import re
@@ -93,20 +94,20 @@ for address in addresses:
     df[address] = address_column_transformed 
 
     ''' delete rows that contain descriptions instead of actual addresses '''
-    address_delete = [] 
+    '''address_delete = [] 
     for i in range(len(df)):
         address_val = df[address][i]
         if search('!', address_val):
             address_delete.append(i)
         
-    df = df.drop(df.index[address_delete])
+    df = df.drop(df.index[address_delete])'''
 
 LBL = LabelEncoder()
 
 LE_vars=[]
-for cat_var in cat_vars:
+'''for cat_var in cat_vars:
     print ("Label Encoding %s" % (cat_var))
-    df[cat_var]=LBL.fit_transform(df[cat_var])
+    df[cat_var]=LBL.fit_transform(df[cat_var])'''
 
 ord_enc = LabelEncoder()
 df["manager_id_label"] = ord_enc.fit_transform(df[["manager_id"]])
@@ -251,7 +252,7 @@ sns.histplot(data=df, x='created_day', bins=31)
 sns.boxplot(df['interest_level'], y=df['created_day'], order=['low','medium','high'])
 '''
 
-df['features'].apply(lambda x: add_unique_elements(x, all_unique_features))
+df['features'].apply(lambda x: functions.add_unique_elements(x, all_unique_features))
 print(len(all_unique_features))
 print('Num. of Unique Features: {}'.format(len(all_unique_features)))
 

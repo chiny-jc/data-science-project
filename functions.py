@@ -1,4 +1,7 @@
 ''' -------------------------------------- FUNCTIONS -------------------------------------- '''
+import re
+import numpy as np
+
 
 def add_unique_elements(list_to_iterate, set_to_add):
     for element in list_to_iterate:

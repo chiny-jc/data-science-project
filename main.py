@@ -23,8 +23,6 @@ import functions
 
 with open('data/train.json') as f:
     data = json.load(f)
-#df = pd.read_json('data/train.json') '''the with statement doesn't work for me, hence I choose to import my data this way.'''
-#df.head()
 
 df = pd.DataFrame(data)
 
@@ -103,7 +101,7 @@ for address in addresses:
         
     df = df.drop(df.index[address_delete])
 
-LBL = preprocessing.LabelEncoder()
+LBL = LabelEncoder()
 
 LE_vars=[]
 for cat_var in cat_vars:
@@ -167,8 +165,8 @@ df['created_hour'] = df['created'].dt.hour
 '''  ----- IMAGE VARIABLES ----- '''
 
 df['num_photos'] = df['photos'].apply(len)
-df['photos_per_bedroom'] = df[['num_of_photos','bedrooms']].apply(lambda x: x[0]/x[1] if x[1]!=0 else 0, axis=1)
-df['photos_per_bathroom'] = df[['num_of_photos','bathrooms']].apply(lambda x: x[0]/x[1] if x[1]!=0 else 0, axis=1)
+df['photos_per_bedroom'] = df[['num_photos','bedrooms']].apply(lambda x: x[0]/x[1] if x[1]!=0 else 0, axis=1)
+df['photos_per_bathroom'] = df[['num_photos','bathrooms']].apply(lambda x: x[0]/x[1] if x[1]!=0 else 0, axis=1)
 
 '''  ----- NUMERICAL VARIABLES ----- '''
 
@@ -266,7 +264,6 @@ one_hot_for_features = multilabel_binarizer.fit_transform(df['features'])
 # Convert target values into ordinal values 
 df['interest_level'] = df['interest_level'].apply(lambda x: 0 if x=='low' else 1 if x=='medium' else 2)
 
-''' ------------------------------------ DATA MODELING ------------------------------------ '''
 
 # Check homogeneity of target values
 sns.countplot('interest_level', data=df)
@@ -299,6 +296,8 @@ df_test, df_val = train_test_split(df_rest, test_size=0.5)
 df_dev, df_test = train_test_split(df, test_size=0.15)
 df_train, df_valid = train_test_split(df_dev, test_size=0.15)
 
+''' ------------------------------------ DATA MODELING ------------------------------------ '''
+
 '''Hyperparameter Tuning the Random Forest in Python'''
 print(df.columns)
 
@@ -314,11 +313,11 @@ X.head()
 
 
  # Number of trees in random forest
-n_estimators = [int(x) for x in np.linspace(start = 200, stop = 2000, num = 10)]
+n_estimators = [int(x) for x in np.linspace(start = 200, stop = 1000, num = 50)]
  #Number of features to consider at every split'''
 max_features = ['auto', 'sqrt']
  #Maximum number of levels in tree'''
-max_depth = [int(x) for x in np.linspace(10, 110, num = 11)]
+max_depth = [int(x) for x in np.linspace(10, 100, num = 10)]
 max_depth.append(None)
  #Minimum number of samples required to split a node'''
 min_samples_split = [2, 5, 10]

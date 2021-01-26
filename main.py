@@ -1,5 +1,4 @@
 ''' ------------------------------ IMPORTING THE LIBRARIES -------------------------------- '''
-
 import json
 import re
 
@@ -89,14 +88,15 @@ for address in addresses:
 
     df[address] = address_column_transformed 
 
-    ''' delete rows that contain descriptions instead of actual addresses '''
-    address_delete = [] 
-    for i in range(len(df)):
-        address_val = df[address][i]
-        if search('!', address_val):
-            address_delete.append(i)
+
+''' delete rows that contain descriptions instead of actual addresses '''
+address_delete = [] 
+for i in range(len(df)):
+    address_val = df[address][i]
+    if search('!', address_val):
+        address_delete.append(i)
         
-    df = df.drop(df.index[address_delete])
+df = df.drop(df.index[address_delete])
   
 display=df["display_address"].value_counts()
 manager_id=df["manager_id"].value_counts()
@@ -112,7 +112,19 @@ price_by_building = df.groupby('building_id')['price'].agg([np.min,np.max,np.mea
 price_by_building.columns = ['building_id','min_price_by_building',
                             'max_price_by_building','mean_price_by_building']
 df = pd.merge(df,price_by_building, how='left',on='building_id')
+df = df.drop(df.index[address_delete])
 
+'''
+LBL = LabelEncoder()
+LE_vars=[]
+for cat_var in cat_vars:
+    print ("Label Encoding %s" % (cat_var))
+    df[cat_var]=LBL.fit_transform(df[cat_var])
+
+ord_enc = LabelEncoder()
+df["manager_id_label"] = ord_enc.fit_transform(df[["manager_id"]])
+df[["manager_id_label", "manager_id"]].head()
+'''
 
 '''  ----- TEXT VARIABLES ----- '''
 
@@ -160,7 +172,6 @@ df['created_hour'] = df['created'].dt.hour
 df['num_photos'] = df['photos'].apply(len)
 df['photos_per_bedroom'] = df[['num_photos','bedrooms']].apply(lambda x: x[0]/x[1] if x[1]!=0 else 0, axis=1)
 df['photos_per_bathroom'] = df[['num_photos','bathrooms']].apply(lambda x: x[0]/x[1] if x[1]!=0 else 0, axis=1)
-
 
 
 '''  ----- NUMERICAL VARIABLES ----- '''
@@ -244,9 +255,21 @@ print(df['created_day'].unique())
 sns.histplot(data=df, x='created_day', bins=31)
 sns.boxplot(df['interest_level'], y=df['created_day'], order=['low','medium','high'])
 '''
+
     
 ''' ------------------------------------ DATA MODELING ------------------------------------ '''
 
+'''
+df['features'].apply(lambda x: functions.add_unique_elements(x, all_unique_features))
+print(len(all_unique_features))
+print('Num. of Unique Features: {}'.format(len(all_unique_features)))
+
+one_hot_encoder = OneHotEncoder(sparse=False)
+one_hot_for_manager_ids = one_hot_encoder.fit_transform(pd.DataFrame(df['manager_id']))
+
+multilabel_binarizer = MultiLabelBinarizer()
+one_hot_for_features = multilabel_binarizer.fit_transform(df['features'])
+'''
 
 # undersampling: reduce sample size for each class so that we have a balanced dataset
 interest_2 = len(df.loc[df["interest_level"]==2]) #class with fewest samples 
@@ -276,14 +299,21 @@ df_test, df_val = train_test_split(df_rest, test_size=0.5)
 df_dev, df_test = train_test_split(df, test_size=0.15)
 df_train, df_valid = train_test_split(df_dev, test_size=0.15)
 
+''' ------------------------------------ DATA MODELING ------------------------------------ '''
+
 '''Hyperparameter Tuning the Random Forest in Python'''
 print(df.columns)
 
 
+'''
 num_feats = ["manager_id_label","bathrooms", "bedrooms", "latitude", "longitude", "price",
              "num_photos", "num_features", "num_words_description",
              "created_year", "created_month", "created_day"]
+'''
 
+num_feats = ["bathrooms", "bedrooms", "latitude", "longitude", "price",
+             "num_photos", "num_features", "num_words_description",
+             "created_year", "created_month"] #dropped manager_id_label and created_day
 
 X = df[num_feats]
 y = df["interest_level"]
@@ -291,11 +321,11 @@ X.head()
 
 
  # Number of trees in random forest
-n_estimators = [int(x) for x in np.linspace(start = 200, stop = 2000, num = 10)]
+n_estimators = [int(x) for x in np.linspace(start = 200, stop = 1000, num = 50)]
  #Number of features to consider at every split'''
 max_features = ['auto', 'sqrt']
  #Maximum number of levels in tree'''
-max_depth = [int(x) for x in np.linspace(10, 110, num = 11)]
+max_depth = [int(x) for x in np.linspace(10, 100, num = 10)]
 max_depth.append(None)
  #Minimum number of samples required to split a node'''
 min_samples_split = [2, 5, 10]

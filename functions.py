@@ -1,4 +1,7 @@
 ''' -------------------------------------- FUNCTIONS -------------------------------------- '''
+import re
+import numpy as np
+
 
 import json
 import re

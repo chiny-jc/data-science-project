@@ -10,13 +10,16 @@ import string
 
 from re import search 
 
-from sklearn.model_selection import train_test_split, RandomizedSearchCV, GridSearchCV
+from sklearn.model_selection import train_test_split, RandomizedSearchCV, GridSearchCV, RepeatedKFold
 from sklearn.ensemble import RandomForestClassifier
+from sklearn import metrics
 from sklearn.metrics import log_loss
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn import preprocessing
-from sklearn.preprocessing import OneHotEncoder, MultiLabelBinarizer
+from sklearn.preprocessing import OneHotEncoder, MultiLabelBinarizer, LabelEncoder
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import ElasticNet
+
 
 import functions
 
@@ -124,7 +127,10 @@ for cat_var in cat_vars:
 ord_enc = LabelEncoder()
 df["manager_id_label"] = ord_enc.fit_transform(df[["manager_id"]])
 df[["manager_id_label", "manager_id"]].head()
+
+We still can't run this code, hence manager_id is still not transformed, should we drop it?
 '''
+
 
 '''  ----- TEXT VARIABLES ----- '''
 
@@ -201,6 +207,9 @@ df['distance_to_times_square'] = df[['latitude','longitude']].apply(
 
 ''' ------------------------------------ Correlation of Features and Target --------------------------------------- '''
 
+""" Object columns dropped"""
+df = df.drop(['building_id', 'description', 'created', 'display_address', 'manager_id', 'photos', 'street_address' ], axis=1) 
+
 # Convert target values into ordinal values 
 
 df_corr = df.corr()
@@ -257,7 +266,7 @@ sns.boxplot(df['interest_level'], y=df['created_day'], order=['low','medium','hi
 '''
 
     
-''' ------------------------------------ DATA MODELING ------------------------------------ '''
+''' ------------------------------------ Balanced Dataset ------------------------------------ '''
 
 '''
 df['features'].apply(lambda x: functions.add_unique_elements(x, all_unique_features))
@@ -292,45 +301,144 @@ plt.show()
 np.random.seed(123)
 df = df.sample(frac=1) # shuffle data
 
+'''------------------------------------- Data Normalization ------------------------------'''
+
+df_copy = df.drop("interest_level", axis=1)
+scaler = preprocessing.MinMaxScaler()
+names = df_copy.columns
+d = scaler.fit_transform(df_copy)
+scaled_df = pd.DataFrame(d, columns=names)
+scaled_df.head()
+
+
+
+''' ------------------------------------ DATA MODELING ------------------------------------ '''
+
+'''
 df_train, df_rest = train_test_split(df, test_size=0.3)
 df_test, df_val = train_test_split(df_rest, test_size=0.5)
 
 #test
 df_dev, df_test = train_test_split(df, test_size=0.15)
 df_train, df_valid = train_test_split(df_dev, test_size=0.15)
-
-''' ------------------------------------ DATA MODELING ------------------------------------ '''
-
-'''Hyperparameter Tuning the Random Forest in Python'''
-print(df.columns)
-
-
-'''
-num_feats = ["manager_id_label","bathrooms", "bedrooms", "latitude", "longitude", "price",
-             "num_photos", "num_features", "num_words_description",
-             "created_year", "created_month", "created_day"]
 '''
 
-num_feats = ["bathrooms", "bedrooms", "latitude", "longitude", "price",
-             "num_photos", "num_features", "num_words_description",
-             "created_year", "created_month"] #dropped manager_id_label and created_day
+#print(df.columns)
+#print(df.dtypes)
 
-X = df[num_feats]
-y = df["interest_level"]
-X.head()
+X_scaled = scaled_df
+y = df.interest_level
+X_train_scaled, X_test_scaled, y_train , y_test = train_test_split(X_scaled, y, test_size=0.3)
+
+
+'''------------------------Hyperparameter Tuning of ElasticNet----------------------------'''
+
+'''
+# define model
+model = ElasticNet(tol=1)
+# define model evaluation method
+cv = RepeatedKFold(n_splits=10, n_repeats=3, random_state=1)
+# define grid
+grid = dict()
+grid['alpha'] = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 0.0, 1.0, 10.0, 100.0]
+grid['l1_ratio'] = np.arange(0, 1, 0.1)
+# define search
+search = GridSearchCV(model, grid, scoring='neg_mean_absolute_error', cv=cv, n_jobs=-1)
+# perform the search
+results = search.fit(X_train_scaled, y_train)
+# summarize
+print('MAE: %.3f' % results.best_score_)
+print('Config: %s' % results.best_params_)
+'''
+
+
+'''-------------------------------- Pruning of Decision Tree -------------------------------'''
+
+'''
+tree = DecisionTreeClassifier(criterion = "gini", random_state = 123) 
+tree = tree.fit(X_train_scaled, y_train) 
+y_pred = tree.predict(X_test_scaled) 
+print ("Accuracy : ", accuracy_score(y_test,y_pred)*100) 
+
+
+
+#ploting the tree
+
+from sklearn.tree import plot_tree
+plt.figure(figsize = (15,17))
+plot_tree(tree, filled = True, rounded = True, class_names = ['Low Interest', 'Medium Interest', 'High Interest'],feature_names = X_scaled.columns)[0]
+
+#determine values for alpha
+path = tree.cost_complexity_pruning_path(X_train_scaled, y_train)
+
+#extract different values for alpha
+ccp_alphas = path.ccp_alphas 
+ccp_alphas = ccp_alphas[:-1]
+
+
+#create an array to store the resuls of each fold during cross validation
+alpha_loop_values = []
+
+# For each candidate value alpha, we will run 5-fold cross validation
+# Then we will store the mean and std of the scores(accuracy) for each call
+# to cross_val_score in alpha_loop_values...
+
+for ccp_alpha in ccp_alphas:
+    tree = DecisionTreeClassifier(random_state=0, ccp_alpha=ccp_alpha)
+    scores = cross_val_score(tree, X_train_scaled, y_train, cv=5)
+    alpha_loop_values.append([ccp_alpha, np.mean(scores), np.std(scores)])
+#Now we can draw a graph of the means and std of the scores
+#for each candidate value for alpha
+alpha_results = pd.DataFrame(alpha_loop_values, 
+                             columns=['alpha', 'mean_accuracy', 'std'])
+
+alpha_results.plot(x='alpha',
+                   y='mean_accuracy',
+                   yerr = 'std',
+                   marker = 'o',
+                  linestyle ='--')
+
+
+#Printing the best alpha
+
+column = alpha_results["mean_accuracy"]
+max_index = column.idxmax()
+max_index
+
+
+ideal_ccp_alpha = alpha_results.iloc[max_index]['alpha']
+#ideal_ccp_alpha 
+#Prunning the classification tree
+
+tree_pruned = DecisionTreeClassifier(random_state = 123,
+                                    ccp_alpha=ideal_ccp_alpha)
+tree_pruned = tree_pruned.fit(X_train_scaled, y_train)
+
+
+
+
+y_pred = tree_pruned.predict(X_test_scaled) 
+print ("Accuracy : ", accuracy_score(y_test,y_pred)*100) 
+
+#plotting the best tree
+plt.figure(figsize = (20,17))
+plot_tree(tree_pruned, filled = True, rounded = True,class_names = ['Low Interest', 'Medium Interest', 'High Interest'],feature_names = X_scaled.columns)[0]
+'''
+
+'''-------------------------------Hyperparameter Tuning the Random Forest in Python-----------------------------------------'''
 
 
  # Number of trees in random forest
-n_estimators = [int(x) for x in np.linspace(start = 200, stop = 1000, num = 50)]
+n_estimators = [int(x) for x in np.linspace(start = 200, stop = 1000, num = 10)]
  #Number of features to consider at every split'''
 max_features = ['auto', 'sqrt']
  #Maximum number of levels in tree'''
-max_depth = [int(x) for x in np.linspace(10, 100, num = 10)]
+max_depth = [int(x) for x in np.linspace(10, 110, num = 11)]
 max_depth.append(None)
  #Minimum number of samples required to split a node'''
-min_samples_split = [2, 5, 10]
+min_samples_split = [2, 5, 10, 15, 20]
  #Minimum number of samples required at each leaf node'''
-min_samples_leaf = [1, 2, 4]
+min_samples_leaf = [1, 2, 4, 7, 11]
 #Method of selecting samples for training each tree'''
 bootstrap = [True, False]
 
@@ -351,10 +459,10 @@ print(random_grid)
 rf = RandomForestClassifier()
 
 ''' Use the random grid to search for best hyperparameters'''
-rf_random = RandomizedSearchCV(estimator = rf, param_distributions = random_grid, n_iter = 100, cv = 3, verbose=2, random_state=42, n_jobs = -1)
+rf_random = RandomizedSearchCV(estimator = rf, param_distributions = random_grid, n_iter = 100, cv = 3, verbose=2, random_state=123, n_jobs = -1)
 
 '''Fit the random search model'''
-rf_random.fit(X, y)
+rf_random.fit(X_train_scaled, y_train)
 
 print('test')
 
@@ -364,17 +472,22 @@ print(best_params)
 
 #Creating the best model
 
-rf = RandomForestClassifier(n_estimators=1000, min_samples_split= 2, min_samples_leaf=2, max_features = 'sqrt', max_depth=60, bootstrap= True, oob_score = True,random_state=0)
+rf = RandomForestClassifier(n_estimators=377, min_samples_split= 15, min_samples_leaf=2, max_features = 'auto', max_depth=50, bootstrap= True, oob_score = True, random_state=123)
 
-rf.fit(X, y)
+rf.fit(X_train_scaled, y_train)
 
-score = rf.score(X, y)
+score = rf.score(X_train_scaled, y_train)
 print('Accurracy for train:',score)
 
 #OOB is the accuracy in trainnig test using oob samlpes
 print('OOB score',rf.oob_score_)
 
-'''Choosing the best model'''
+y_pred = rf.predict_proba(X_test_scaled)
+
+print(log_loss(y_test, y_pred))
+print(rf.score(X_train_scaled, y_train))
+print(rf.score(X_test_scaled, y_test))
+'''-------------------------------Choosing the best model--------------------------------------------'''
 #Defining model parameters from the tuned parameter
 model_params = {
     'random_forest': {
@@ -387,9 +500,17 @@ model_params = {
     'decision_tree': {
         'model': DecisionTreeClassifier(),
         'params': {
-            'max_depth': [10, 50, 80]
+            'alpha': 0.000289
         }
-    }
+    },
+    
+    'enet': {
+        'model': ElasticNet(tol=1),
+        'params': {
+            'alpha': 1e-05,
+            'l1_ratio': 0.9
+        }
+    },
     
 }
 

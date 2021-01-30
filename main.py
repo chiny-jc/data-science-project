@@ -303,14 +303,15 @@ df = df.sample(frac=1) # shuffle data
 
 '''------------------------------------- Data Normalization ------------------------------'''
 
+
 df_copy = df.drop("interest_level", axis=1)
 scaler = preprocessing.MinMaxScaler()
 names = df_copy.columns
 d = scaler.fit_transform(df_copy)
 scaled_df = pd.DataFrame(d, columns=names)
 scaled_df.head()
-
-
+scaled_df= scaled_df.join(df[['interest_level']].set_index(scaled_df.index))
+scaled_df
 
 ''' ------------------------------------ DATA MODELING ------------------------------------ '''
 
@@ -323,13 +324,24 @@ df_dev, df_test = train_test_split(df, test_size=0.15)
 df_train, df_valid = train_test_split(df_dev, test_size=0.15)
 '''
 
+df_dev, df_rest = train_test_split(scaled_df, test_size=0.3)
+df_test, df_val = train_test_split(df_rest, test_size=0.5)
+
 #print(df.columns)
 #print(df.dtypes)
 
-X_scaled = scaled_df
-y = df.interest_level
-X_train_scaled, X_test_scaled, y_train , y_test = train_test_split(X_scaled, y, test_size=0.3)
+#X_scaled = scaled_df
+#y = df.interest_level
+#X_train_scaled, X_test_scaled, y_train , y_test = train_test_split(X_scaled, y, test_size=0.3)
 
+X_val =  df_val.drop("interest_level", axis=1)
+y_val = df_val["interest_level"]
+
+X_test = df_test.drop("interest_level", axis=1)
+y_test = df_test["interest_level"]
+
+X_dev = df_dev.drop("interest_level", axis=1)
+y_dev = df_dev["interest_level"]
 
 '''------------------------Hyperparameter Tuning of ElasticNet----------------------------'''
 
@@ -429,7 +441,7 @@ plot_tree(tree_pruned, filled = True, rounded = True,class_names = ['Low Interes
 
 
  # Number of trees in random forest
-n_estimators = [int(x) for x in np.linspace(start = 200, stop = 1000, num = 10)]
+n_estimators = [int(x) for x in np.linspace(start = 100, stop = 2000, num = 10)]
  #Number of features to consider at every split'''
 max_features = ['auto', 'sqrt']
  #Maximum number of levels in tree'''
@@ -462,7 +474,7 @@ rf = RandomForestClassifier()
 rf_random = RandomizedSearchCV(estimator = rf, param_distributions = random_grid, n_iter = 100, cv = 3, verbose=2, random_state=123, n_jobs = -1)
 
 '''Fit the random search model'''
-rf_random.fit(X_train_scaled, y_train)
+rf_random.fit(X_val, y_val)
 
 print('test')
 
@@ -472,21 +484,21 @@ print(best_params)
 
 #Creating the best model
 
-rf = RandomForestClassifier(n_estimators=377, min_samples_split= 15, min_samples_leaf=2, max_features = 'auto', max_depth=50, bootstrap= True, oob_score = True, random_state=123)
+rf = RandomForestClassifier(n_estimators=1000, min_samples_split= 15, min_samples_leaf=4, max_features = 'sqrt', max_depth=30, bootstrap= True, oob_score = True, random_state=123)
 
-rf.fit(X_train_scaled, y_train)
+rf.fit(X_dev, y_dev)
 
-score = rf.score(X_train_scaled, y_train)
+score = rf.score(X_dev, y_dev)
 print('Accurracy for train:',score)
 
 #OOB is the accuracy in trainnig test using oob samlpes
 print('OOB score',rf.oob_score_)
 
-y_pred = rf.predict_proba(X_test_scaled)
+y_pred = rf.predict_proba(X_test)
 
 print(log_loss(y_test, y_pred))
-print(rf.score(X_train_scaled, y_train))
-print(rf.score(X_test_scaled, y_test))
+print(rf.score(X_dev, y_dev))
+print(rf.score(X_test, y_test))
 '''-------------------------------Choosing the best model--------------------------------------------'''
 #Defining model parameters from the tuned parameter
 model_params = {

@@ -279,7 +279,7 @@ one_hot_for_manager_ids = one_hot_encoder.fit_transform(pd.DataFrame(df['manager
 multilabel_binarizer = MultiLabelBinarizer()
 one_hot_for_features = multilabel_binarizer.fit_transform(df['features'])
 '''
-
+'''
 # undersampling: reduce sample size for each class so that we have a balanced dataset
 interest_2 = len(df.loc[df["interest_level"]==2]) #class with fewest samples 
 print(interest_2)
@@ -300,6 +300,7 @@ plt.show()
 
 np.random.seed(123)
 df = df.sample(frac=1) # shuffle data
+'''
 
 '''------------------------------------- Data Normalization ------------------------------'''
 
@@ -342,6 +343,10 @@ y_test = df_test["interest_level"]
 
 X_dev = df_dev.drop("interest_level", axis=1)
 y_dev = df_dev["interest_level"]
+
+
+X = scaled_df.drop("interest_level", axis=1)
+y = scaled_df["interest_level"]
 
 '''------------------------Hyperparameter Tuning of ElasticNet----------------------------'''
 
@@ -484,7 +489,7 @@ print(best_params)
 
 #Creating the best model
 
-rf = RandomForestClassifier(n_estimators=1000, min_samples_split= 15, min_samples_leaf=4, max_features = 'sqrt', max_depth=30, bootstrap= True, oob_score = True, random_state=123)
+rf = RandomForestClassifier(n_estimators=377, min_samples_split= 15, min_samples_leaf=2, max_features = 'auto', max_depth=50, bootstrap= True, oob_score = True, random_state=123)
 
 rf.fit(X_dev, y_dev)
 
@@ -499,6 +504,86 @@ y_pred = rf.predict_proba(X_test)
 print(log_loss(y_test, y_pred))
 print(rf.score(X_dev, y_dev))
 print(rf.score(X_test, y_test))
+
+
+
+
+
+
+
+
+'''---------Ranfom Forest Feature Selection --------------------------------'''
+
+'''
+from sklearn.feature_selection import SelectFromModel
+sel = SelectFromModel(RandomForestClassifier(n_estimators = 100))
+sel.fit(X_dev, y_dev)
+
+
+
+#To see which feature are important
+sel.get_support()
+
+
+
+#to get the number of important features
+selected_feat= X_dev.columns[(sel.get_support())]
+len(selected_feat)
+
+
+
+#to get the name of feature selected
+print(selected_feat)
+
+
+
+#Testin the results
+sel_feat_df = scaled_df[['latitude', 'listing_id', 'longitude', 'price', 'display_count',
+'manager_count', 'building_count', 'min_price_by_building',
+'max_price_by_building', 'mean_price_by_building', 'length_description',
+'num_words_description', 'created_day_of_month', 'created_hour',
+'price_per_room', 'price_per_bedroom', 'price_per_bathroom',
+'price_per_word_description', 'price_per_length_description',
+'price_per_feature', 'price_per_photo', 'distance_to_central_park',
+'distance_to_wall_street', 'distance_to_times_square']]
+
+
+
+
+X_scaled = sel_feat_df
+y = scaled_df.interest_level
+X_train_scaled, X_test_scaled, y_train , y_test = train_test_split(X_scaled, y, test_size=0.3)
+
+
+
+
+rf = RandomForestClassifier()
+
+
+
+rf.fit(X_train_scaled, y_train)
+
+
+
+score = rf.score(X_train_scaled, y_train)
+print('Accurracy for train:',score)
+
+
+
+#OOB is the accuracy in trainnig test using oob samlpes
+#print('OOB score',rf.oob_score_)
+
+
+
+y_pred = rf.predict_proba(X_test_scaled)
+
+
+
+print('Log Loss:',log_loss(y_test, y_pred))
+print('Train:',rf.score(X_train_scaled, y_train))
+print('Test:', rf.score(X_test_scaled, y_test))
+'''
+
 '''-------------------------------Choosing the best model--------------------------------------------'''
 #Defining model parameters from the tuned parameter
 model_params = {

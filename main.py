@@ -56,6 +56,20 @@ plt.title('Unbalanced Classes')
 addresses = ['display_address', 'street_address']
 
 for address in addresses:
+    print(address)
+    ''' delete rows that contain descriptions instead of actual addresses '''
+    address_delete = [] 
+    for i in range(len(df)):
+        address_val = df[address][i]
+        if search('!' or '*', address_val):
+            address_delete.append(i)
+
+    df = df.drop(df.index[address_delete])
+    print("Num. of deleted addresses: {}".format(
+        len(address_delete)))
+    
+    
+    ''' Data Cleaning '''
     address_column = df[address]
     address_column_transformed = ( address_column
                                            .apply(str.upper)
@@ -90,17 +104,8 @@ for address in addresses:
         address_column_transformed.nunique()))
 
     df[address] = address_column_transformed 
+    
 
-
-''' delete rows that contain descriptions instead of actual addresses '''
-address_delete = [] 
-for i in range(len(df)):
-    address_val = df[address][i]
-    if search('!', address_val):
-        address_delete.append(i)
-        
-df = df.drop(df.index[address_delete])
-  
 display=df["display_address"].value_counts()
 manager_id=df["manager_id"].value_counts()
 building_id=df["building_id"].value_counts()
@@ -117,19 +122,10 @@ price_by_building.columns = ['building_id','min_price_by_building',
 df = pd.merge(df,price_by_building, how='left',on='building_id')
 df = df.drop(df.index[address_delete])
 
-'''
-LBL = LabelEncoder()
-LE_vars=[]
+OE = OrdinalEncoder()
 for cat_var in cat_vars:
-    print ("Label Encoding %s" % (cat_var))
-    df[cat_var]=LBL.fit_transform(df[cat_var])
-
-ord_enc = LabelEncoder()
-df["manager_id_label"] = ord_enc.fit_transform(df[["manager_id"]])
-df[["manager_id_label", "manager_id"]].head()
-
-We still can't run this code, hence manager_id is still not transformed, should we drop it?
-'''
+    print ("Ordinal Encoding %s" % (cat_var))
+    df[cat_var]=OE.fit_transform(df[[cat_var]])
 
 
 '''  ----- TEXT VARIABLES ----- '''
@@ -156,13 +152,14 @@ df['num_words_description'] = df['description'].apply(lambda x: len(x.split(" ")
 
 df['num_features'] = df['features'].apply(len)
 
-v = CountVectorizer(stop_words='english', max_features=100)
+v = CountVectorizer(stop_words='english', max_features=50)
 x = v.fit_transform(df['features']\
                                      .apply(lambda x: " ".join(["_".join(i.split(" ")) for i in x])))
 
 df1 = pd.DataFrame(x.toarray(), columns=v.get_feature_names())
 df.drop('features', axis=1, inplace=True)
-res = df.join(df1.set_index(df.index))
+df = df.join(df1.set_index(df.index))
+
 
 '''  ----- DATE VARIABLES ----- '''
 

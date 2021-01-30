@@ -16,7 +16,7 @@ from sklearn import metrics
 from sklearn.metrics import log_loss
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn import preprocessing
-from sklearn.preprocessing import OneHotEncoder, MultiLabelBinarizer, LabelEncoder
+from sklearn.preprocessing import OneHotEncoder, MultiLabelBinarizer, LabelEncoder, OrdinalEncoder
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import ElasticNet
 
@@ -122,6 +122,7 @@ price_by_building.columns = ['building_id','min_price_by_building',
 df = pd.merge(df,price_by_building, how='left',on='building_id')
 df = df.drop(df.index[address_delete])
 
+cat_vars = ['building_id','manager_id','display_address','street_address']
 OE = OrdinalEncoder()
 for cat_var in cat_vars:
     print ("Ordinal Encoding %s" % (cat_var))
@@ -447,12 +448,12 @@ n_estimators = [int(x) for x in np.linspace(start = 100, stop = 2000, num = 10)]
  #Number of features to consider at every split'''
 max_features = ['auto', 'sqrt']
  #Maximum number of levels in tree'''
-max_depth = [int(x) for x in np.linspace(10, 110, num = 11)]
-max_depth.append(None)
+max_depth = np.arange(start=10, stop=111, step=5)
+#max_depth.append(None)
  #Minimum number of samples required to split a node'''
-min_samples_split = [2, 5, 10, 15, 20]
+min_samples_split = np.arange(start=2, stop=101)
  #Minimum number of samples required at each leaf node'''
-min_samples_leaf = [1, 2, 4, 7, 11]
+min_samples_leaf = np.arange(start=2, stop=101)
 #Method of selecting samples for training each tree'''
 bootstrap = [True, False]
 
@@ -486,7 +487,7 @@ print(best_params)
 
 #Creating the best model
 
-rf = RandomForestClassifier(n_estimators=377, min_samples_split= 15, min_samples_leaf=2, max_features = 'auto', max_depth=50, bootstrap= True, oob_score = True, random_state=123)
+rf = RandomForestClassifier(n_estimators=1155, min_samples_split= 5, min_samples_leaf=11, max_features = 'sqrt', max_depth=80, bootstrap= False, oob_score = False, random_state=123)
 
 rf.fit(X_dev, y_dev)
 
@@ -494,7 +495,7 @@ score = rf.score(X_dev, y_dev)
 print('Accurracy for train:',score)
 
 #OOB is the accuracy in trainnig test using oob samlpes
-print('OOB score',rf.oob_score_)
+#print('OOB score',rf.oob_score_)
 
 y_pred = rf.predict_proba(X_test)
 
@@ -505,11 +506,7 @@ print(rf.score(X_test, y_test))
 
 
 
-
-
-
-
-'''---------Ranfom Forest Feature Selection --------------------------------'''
+'''---------Random Forest Feature Selection --------------------------------'''
 
 '''
 from sklearn.feature_selection import SelectFromModel

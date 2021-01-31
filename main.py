@@ -1,25 +1,21 @@
 ''' ------------------------------ IMPORTING THE LIBRARIES -------------------------------- '''
 import json
 import re
+import string
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
-import string 
+import seaborn as sns 
 
-from re import search 
-
-from sklearn.model_selection import train_test_split, RandomizedSearchCV, GridSearchCV, RepeatedKFold
+from sklearn.model_selection import train_test_split, RandomizedSearchCV, GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
-from sklearn import metrics
 from sklearn.metrics import log_loss
-from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
+from sklearn.feature_extraction.text import CountVectorizer
 from sklearn import preprocessing
-from sklearn.preprocessing import OneHotEncoder, MultiLabelBinarizer, LabelEncoder, OrdinalEncoder
+from sklearn.preprocessing import OrdinalEncoder
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import ElasticNet
-
 
 import functions
 
@@ -61,7 +57,7 @@ for address in addresses:
     address_delete = [] 
     for i in range(len(df)):
         address_val = df[address][i]
-        if search('!' or '*', address_val):
+        if re.search('!' or '*', address_val):
             address_delete.append(i)
 
     df = df.drop(df.index[address_delete])
@@ -474,7 +470,8 @@ print(random_grid)
 rf = RandomForestClassifier()
 
 ''' Use the random grid to search for best hyperparameters'''
-rf_random = RandomizedSearchCV(estimator = rf, param_distributions = random_grid, n_iter = 100, cv = 3, verbose=2, random_state=123, n_jobs = -1)
+rf_random = RandomizedSearchCV(estimator = rf, param_distributions = random_grid, n_iter = 100, cv = 3, verbose=2, 
+                               random_state=123, n_jobs = -1)
 
 '''Fit the random search model'''
 rf_random.fit(X_val, y_val)
@@ -487,7 +484,10 @@ print(best_params)
 
 #Creating the best model
 
-rf = RandomForestClassifier(n_estimators=1155, min_samples_split= 5, min_samples_leaf=11, max_features = 'sqrt', max_depth=80, bootstrap= False, oob_score = False, random_state=123)
+rf = RandomForestClassifier(n_estimators=best_params['n_estimators'], min_samples_split=best_params['min_samples_split'],
+                            min_samples_leaf=best_params['min_samples_leaf'], max_features = best_params['max_features'], 
+                            max_depth=best_params['max_depth'], bootstrap= best_params['bootstrap'], oob_score = False, 
+                            random_state=123)
 
 rf.fit(X_dev, y_dev)
 

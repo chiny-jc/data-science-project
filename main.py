@@ -16,6 +16,8 @@ from sklearn import preprocessing
 from sklearn.preprocessing import OrdinalEncoder
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import ElasticNet
+from sklearn.feature_selection import SelectFromModel, RFECV
+
 
 from rfpimp import *
 from sklearn.inspection import permutation_importance
@@ -296,30 +298,6 @@ X_train, X_test, y_train , y_test = train_test_split(X, y, test_size=0.15)
 
 
 
-
-
-
-'''------------------------Hyperparameter Tuning of ElasticNet----------------------------'''
-
-'''
-# define model
-model = ElasticNet(tol=1)
-# define model evaluation method
-cv = RepeatedKFold(n_splits=10, n_repeats=3, random_state=1)
-# define grid
-grid = dict()
-grid['alpha'] = [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 0.0, 1.0, 10.0, 100.0]
-grid['l1_ratio'] = np.arange(0, 1, 0.1)
-# define search
-search = GridSearchCV(model, grid, scoring='neg_mean_absolute_error', cv=cv, n_jobs=-1)
-# perform the search
-results = search.fit(X_train_scaled, y_train)
-# summarize
-print('MAE: %.3f' % results.best_score_)
-print('Config: %s' % results.best_params_)
-'''
-
-
 '''-------------------------------- Pruning of Decision Tree -------------------------------'''
 
 '''
@@ -393,6 +371,50 @@ plt.figure(figsize = (20,17))
 plot_tree(tree_pruned, filled = True, rounded = True,class_names = ['Low Interest', 'Medium Interest', 'High Interest'],feature_names = X.columns)[0]
 '''
 
+
+'''---------Random Forest Feature Selection --------------------------------'''
+
+
+sel = SelectFromModel(RandomForestClassifier())
+sel.fit(X_train, y_train)
+
+
+#To see which feature are important
+sel.get_support()
+
+
+#to get the number of important features
+selected_feat= X_train.columns[(sel.get_support())]
+len(selected_feat)
+
+
+#to get the name of feature selected
+print(selected_feat)
+
+
+X_train= X_train[selected_feat]
+X_test= X_test[selected_feat]
+
+
+'''---------------------------------RFECV Feature Selection---------------------'''
+
+
+estimator = RandomForestClassifier()
+selector = RFECV(estimator, step=1, cv=5)
+selector = selector.fit(X_train, y_train)
+sel_features = selector.get_support(indices=True)
+print(sel_features)
+
+for feat in sel_features:
+    sel_feat = X.columns[sel_features]
+print(sel_feat)
+
+
+X_train= X_train[sel_feat]
+X_test= X_test[sel_feat]
+
+
+
 '''-------------------------------Hyperparameter Tuning the Random Forest in Python-----------------------------------------'''
 
 
@@ -458,77 +480,6 @@ print('test_acc:', rf.score(X_test, y_test))
 
 
 
-'''---------Random Forest Feature Selection --------------------------------'''
-
-'''
-from sklearn.feature_selection import SelectFromModel
-sel = SelectFromModel(RandomForestClassifier(n_estimators = 100))
-sel.fit(X_dev, y_dev)
-
-
-
-#To see which feature are important
-sel.get_support()
-
-
-
-#to get the number of important features
-selected_feat= X_dev.columns[(sel.get_support())]
-len(selected_feat)
-
-
-
-#to get the name of feature selected
-print(selected_feat)
-
-
-
-#Testin the results
-sel_feat_df = scaled_df[['latitude', 'listing_id', 'longitude', 'price', 'display_count',
-'manager_count', 'building_count', 'min_price_by_building',
-'max_price_by_building', 'mean_price_by_building', 'length_description',
-'num_words_description', 'created_day_of_month', 'created_hour',
-'price_per_room', 'price_per_bedroom', 'price_per_bathroom',
-'price_per_word_description', 'price_per_length_description',
-'price_per_feature', 'price_per_photo', 'distance_to_central_park',
-'distance_to_wall_street', 'distance_to_times_square']]
-
-
-
-
-X_scaled = sel_feat_df
-y = scaled_df.interest_level
-X_train_scaled, X_test_scaled, y_train , y_test = train_test_split(X_scaled, y, test_size=0.3)
-
-
-
-
-rf = RandomForestClassifier()
-
-
-
-rf.fit(X_train_scaled, y_train)
-
-
-
-score = rf.score(X_train_scaled, y_train)
-print('Accurracy for train:',score)
-
-
-
-#OOB is the accuracy in trainnig test using oob samlpes
-#print('OOB score',rf.oob_score_)
-
-
-
-y_pred = rf.predict_proba(X_test_scaled)
-
-
-
-print('Log Loss:',log_loss(y_test, y_pred))
-print('Train:',rf.score(X_train_scaled, y_train))
-print('Test:', rf.score(X_test_scaled, y_test))
-'''
 
 '''-------------------------------Choosing the best model--------------------------------------------'''
 
@@ -631,6 +582,22 @@ res= gini_imp.merge(perm_imp, left_index=True, right_index=True).reset_index().\
 res.loc[43] = ['runtime(s)', t1-t0, t2-t1]
 
 print(res)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

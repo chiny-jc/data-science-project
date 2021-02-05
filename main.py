@@ -17,6 +17,10 @@ from sklearn.preprocessing import OrdinalEncoder
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import ElasticNet
 
+from rfpimp import *
+from sklearn.inspection import permutation_importance
+from time import time
+
 import functions
 
 ''' ---------------------------------- READING THE FILE ----------------------------------- '''
@@ -202,7 +206,7 @@ df['distance_to_times_square'] = df[['latitude','longitude']].apply(
 ''' ------------------------------------ Correlation of Features and Target --------------------------------------- '''
 
 """ Object columns dropped"""
-df = df.drop(['building_id', 'description', 'created', 'display_address', 'manager_id', 'photos', 'street_address' ], axis=1) 
+df = df.drop(['building_id', 'description', 'created', 'display_address', 'manager_id', 'photos', 'street_address', 'listing_id' ], axis=1) 
 
 # Convert target values into ordinal values 
 
@@ -260,41 +264,11 @@ sns.boxplot(df['interest_level'], y=df['created_day'], order=['low','medium','hi
 '''
 
     
-''' ------------------------------------ Balanced Dataset ------------------------------------ '''
-
-'''
-df['features'].apply(lambda x: functions.add_unique_elements(x, all_unique_features))
-print(len(all_unique_features))
-print('Num. of Unique Features: {}'.format(len(all_unique_features)))
-
-one_hot_encoder = OneHotEncoder(sparse=False)
-one_hot_for_manager_ids = one_hot_encoder.fit_transform(pd.DataFrame(df['manager_id']))
-
-multilabel_binarizer = MultiLabelBinarizer()
-one_hot_for_features = multilabel_binarizer.fit_transform(df['features'])
-'''
-'''
-# undersampling: reduce sample size for each class so that we have a balanced dataset
-interest_2 = len(df.loc[df["interest_level"]==2]) #class with fewest samples 
-print(interest_2)
-shuffled_df = df.sample(frac=1,random_state=42)
-df_0_reduced = shuffled_df.loc[shuffled_df['interest_level'] == 0].sample(n=interest_2,random_state=42)
-df_1_reduced = shuffled_df.loc[shuffled_df['interest_level'] == 1].sample(n=interest_2,random_state=42)
-df_2 = shuffled_df.loc[shuffled_df['interest_level'] == 2]
-
-# Concatenate dataframes again
-df = pd.concat([df_0_reduced, df_1_reduced, df_2]) #balanced dataset
-
-#plot the dataset after the undersampling
-plt.figure(figsize=(8, 8))
-sns.countplot('interest_level', data=df)
-plt.title('Balanced Classes')
-plt.show()
 
 
 np.random.seed(123)
 df = df.sample(frac=1) # shuffle data
-'''
+
 
 '''------------------------------------- Data Normalization ------------------------------'''
 
@@ -311,36 +285,19 @@ scaled_df
 ''' ------------------------------------ DATA MODELING ------------------------------------ '''
 
 '''
-df_train, df_rest = train_test_split(df, test_size=0.3)
-df_test, df_val = train_test_split(df_rest, test_size=0.5)
-
-#test
-df_dev, df_test = train_test_split(df, test_size=0.15)
-df_train, df_valid = train_test_split(df_dev, test_size=0.15)
-'''
-
 df_dev, df_rest = train_test_split(scaled_df, test_size=0.3)
 df_test, df_val = train_test_split(df_rest, test_size=0.5)
-
-#print(df.columns)
-#print(df.dtypes)
-
-#X_scaled = scaled_df
-#y = df.interest_level
-#X_train_scaled, X_test_scaled, y_train , y_test = train_test_split(X_scaled, y, test_size=0.3)
-
-X_val =  df_val.drop("interest_level", axis=1)
-y_val = df_val["interest_level"]
-
-X_test = df_test.drop("interest_level", axis=1)
-y_test = df_test["interest_level"]
-
-X_dev = df_dev.drop("interest_level", axis=1)
-y_dev = df_dev["interest_level"]
-
+'''
 
 X = scaled_df.drop("interest_level", axis=1)
 y = scaled_df["interest_level"]
+
+X_train, X_test, y_train , y_test = train_test_split(X, y, test_size=0.15)
+
+
+
+
+
 
 '''------------------------Hyperparameter Tuning of ElasticNet----------------------------'''
 
@@ -367,8 +324,8 @@ print('Config: %s' % results.best_params_)
 
 '''
 tree = DecisionTreeClassifier(criterion = "gini", random_state = 123) 
-tree = tree.fit(X_train_scaled, y_train) 
-y_pred = tree.predict(X_test_scaled) 
+tree = tree.fit(X_train, y_train) 
+y_pred = tree.predict(X_test) 
 print ("Accuracy : ", accuracy_score(y_test,y_pred)*100) 
 
 
@@ -396,7 +353,7 @@ alpha_loop_values = []
 
 for ccp_alpha in ccp_alphas:
     tree = DecisionTreeClassifier(random_state=0, ccp_alpha=ccp_alpha)
-    scores = cross_val_score(tree, X_train_scaled, y_train, cv=5)
+    scores = cross_val_score(tree, X_train, y_train, cv=5)
     alpha_loop_values.append([ccp_alpha, np.mean(scores), np.std(scores)])
 #Now we can draw a graph of the means and std of the scores
 #for each candidate value for alpha
@@ -423,24 +380,24 @@ ideal_ccp_alpha = alpha_results.iloc[max_index]['alpha']
 
 tree_pruned = DecisionTreeClassifier(random_state = 123,
                                     ccp_alpha=ideal_ccp_alpha)
-tree_pruned = tree_pruned.fit(X_train_scaled, y_train)
+tree_pruned = tree_pruned.fit(X_train, y_train)
 
 
 
 
-y_pred = tree_pruned.predict(X_test_scaled) 
+y_pred = tree_pruned.predict(X_test) 
 print ("Accuracy : ", accuracy_score(y_test,y_pred)*100) 
 
 #plotting the best tree
 plt.figure(figsize = (20,17))
-plot_tree(tree_pruned, filled = True, rounded = True,class_names = ['Low Interest', 'Medium Interest', 'High Interest'],feature_names = X_scaled.columns)[0]
+plot_tree(tree_pruned, filled = True, rounded = True,class_names = ['Low Interest', 'Medium Interest', 'High Interest'],feature_names = X.columns)[0]
 '''
 
 '''-------------------------------Hyperparameter Tuning the Random Forest in Python-----------------------------------------'''
 
 
  # Number of trees in random forest
-n_estimators = [int(x) for x in np.linspace(start = 100, stop = 2000, num = 10)]
+n_estimators = np.arange(start=100, stop=2001, step=10)
  #Number of features to consider at every split'''
 max_features = ['auto', 'sqrt']
  #Maximum number of levels in tree'''
@@ -470,11 +427,11 @@ print(random_grid)
 rf = RandomForestClassifier()
 
 ''' Use the random grid to search for best hyperparameters'''
-rf_random = RandomizedSearchCV(estimator = rf, param_distributions = random_grid, n_iter = 100, cv = 3, verbose=2, 
+rf_random = RandomizedSearchCV(estimator = rf, param_distributions = random_grid, n_iter = 20, cv = 5, verbose=2, 
                                random_state=123, n_jobs = -1)
 
 '''Fit the random search model'''
-rf_random.fit(X_val, y_val)
+rf_random.fit(X_train, y_train)
 
 print('test')
 
@@ -489,19 +446,14 @@ rf = RandomForestClassifier(n_estimators=best_params['n_estimators'], min_sample
                             max_depth=best_params['max_depth'], bootstrap= best_params['bootstrap'], oob_score = False, 
                             random_state=123)
 
-rf.fit(X_dev, y_dev)
+rf.fit(X_train, y_train)
 
-score = rf.score(X_dev, y_dev)
-print('Accurracy for train:',score)
-
-#OOB is the accuracy in trainnig test using oob samlpes
-#print('OOB score',rf.oob_score_)
 
 y_pred = rf.predict_proba(X_test)
 
-print(log_loss(y_test, y_pred))
-print(rf.score(X_dev, y_dev))
-print(rf.score(X_test, y_test))
+print('log_loss:', log_loss(y_test, y_pred))
+print('train_acc:', rf.score(X_train, y_train))
+print('test_acc:', rf.score(X_test, y_test))
 
 
 
@@ -579,27 +531,29 @@ print('Test:', rf.score(X_test_scaled, y_test))
 '''
 
 '''-------------------------------Choosing the best model--------------------------------------------'''
+
+
+ideal_ccp_alpha = 0.000289
+
+
 #Defining model parameters from the tuned parameter
 model_params = {
     'random_forest': {
         'model': RandomForestClassifier(),
         'params': {
-            'n_estimators': [100, 600, 1100]
+            'n_estimators': best_params['n_estimators'],
+            'min_samples_split': best_params['min_samples_split'],
+            'min_samples_leaf': best_params['min_samples_leaf'],
+            'max_features': best_params['max_features'],
+            'max_depth': best_params['max_depth'],
+            'bootstrap': best_params['bootstrap']
         }
     },
     
     'decision_tree': {
         'model': DecisionTreeClassifier(),
         'params': {
-            'alpha': 0.000289
-        }
-    },
-    
-    'enet': {
-        'model': ElasticNet(tol=1),
-        'params': {
-            'alpha': 1e-05,
-            'l1_ratio': 0.9
+            'ccp_alpha': ideal_ccp_alpha
         }
     },
     
@@ -607,15 +561,76 @@ model_params = {
 
 #Loop over both decision tree and random forest to determine the best model for the given dataset
 scores = []
+print(model_params.items())
 
+trained_models = []
 for model_name, mp in model_params.items():
-    clf = GridSearchCV(mp['model'], mp['params'], cv=5)
-    clf.fit(X, y)
+    clf = mp['model']
+    clf.set_params(**mp['params'])
+    clf.fit(X_train, y_train)
+    y_pred = clf.predict_proba(X_test)
     scores.append({
         'model': model_name,
-        'best_score': clf.best_score_,
-        'best_params': clf.best_params_
+        'train_score': clf.score(X_train, y_train),
+        'test_score': clf.score(X_test, y_test),
+        'log_loss': log_loss(y_test, y_pred)
     })
+    trained_models.append(clf)
     
-best_model = pd.DataFrame(scores, columns= ['model','best_score','best_params'])
+best_model = pd.DataFrame(scores, columns= ['model','train_score','test_score', 'log_loss'])
 print(best_model)
+print(trained_models)
+
+
+
+
+'''------------------------------------ Feature Importance ----------------------------------------------------'''
+
+rf = trained_models[0]
+
+
+#MDI
+MDI_importances = rf.feature_importances_
+indices = np.argsort(MDI_importances)
+features = X.columns
+
+#MDA
+MDA_test = permutation_importance(rf, X_test, y_test, n_repeats=10, random_state=123)
+sorted_idx1 = MDA_test.importances_mean.argsort()
+MDA_train = permutation_importance(rf, X_train, y_train, n_repeats=10, random_state=123)
+sorted_idx2 = MDA_train.importances_mean.argsort()
+
+#Plotting
+plt.rcParams["figure.figsize"]=15,5
+fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
+ax1.set_title('MDI Importances')
+ax1.barh(range(len(indices)), MDI_importances[indices], color='b', align='center')
+ax1.set_yticks( np.arange(42))
+ax1.set_yticklabels(features[indices])
+ax1.set(xlabel='Relative Importance')
+ax2.boxplot(MDA_train.importances[sorted_idx2].T,
+vert=False, labels=features[sorted_idx2])
+tpmp=ax2.set_title("Permutation Importances (train)")
+ax3.boxplot(MDA_test.importances[sorted_idx1].T,
+vert=False, labels=features[sorted_idx1])
+tpmp=ax3.set_title("Permutation Importances (test)")
+fig.tight_layout()
+
+#Table of results
+# record times for comparison
+t0 = time()
+# Gini importance
+gini_imp = pd.DataFrame({'Feature': X.columns, 'Gini Importance': rf.feature_importances_}).set_index('Feature')
+
+t1 = time()# Permutation importance for train
+perm_imp = permutation_importance(rf, X_train, y_train)
+
+t2 = time()
+res= gini_imp.merge(perm_imp, left_index=True, right_index=True).reset_index().\
+        rename(columns={'Importance': 'Permutation Importance'})
+res.loc[43] = ['runtime(s)', t1-t0, t2-t1]
+
+print(res)
+
+
+

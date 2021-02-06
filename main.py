@@ -543,7 +543,7 @@ rf = trained_models[0]
 #MDI
 MDI_importances = rf.feature_importances_
 indices = np.argsort(MDI_importances)
-features = X.columns
+features = X_train.columns
 
 #MDA
 MDA_test = permutation_importance(rf, X_test, y_test, n_repeats=10, random_state=123)
@@ -556,7 +556,7 @@ plt.rcParams["figure.figsize"]=15,5
 fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
 ax1.set_title('MDI Importances')
 ax1.barh(range(len(indices)), MDI_importances[indices], color='b', align='center')
-ax1.set_yticks( np.arange(42))
+ax1.set_yticks( np.arange(len(X_train.columns)))
 ax1.set_yticklabels(features[indices])
 ax1.set(xlabel='Relative Importance')
 ax2.boxplot(MDA_train.importances[sorted_idx2].T,
@@ -574,12 +574,12 @@ t0 = time()
 gini_imp = pd.DataFrame({'Feature': X.columns, 'Gini Importance': rf.feature_importances_}).set_index('Feature')
 
 t1 = time()# Permutation importance for train
-perm_imp = permutation_importance(rf, X_train, y_train)
+perm_imp = importances(rf, X_train, y_train)
 
 t2 = time()
 res= gini_imp.merge(perm_imp, left_index=True, right_index=True).reset_index().\
         rename(columns={'Importance': 'Permutation Importance'})
-res.loc[43] = ['runtime(s)', t1-t0, t2-t1]
+res.loc[len(X_train.columns)+1] = ['runtime(s)', t1-t0, t2-t1]
 
 print(res)
 

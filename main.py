@@ -19,9 +19,11 @@ from sklearn.linear_model import ElasticNet
 from sklearn.feature_selection import SelectFromModel, RFECV
 
 
-from rfpimp import *
+from pdpbox import pdp, get_dataset, info_plots
 from sklearn.inspection import permutation_importance
 from time import time
+from rfpimp import *
+import shap
 
 import functions
 
@@ -274,7 +276,7 @@ df = df.sample(frac=1) # shuffle data
 
 '''------------------------------------- Data Normalization ------------------------------'''
 
-
+'''
 df_copy = df.drop("interest_level", axis=1)
 scaler = preprocessing.MinMaxScaler()
 names = df_copy.columns
@@ -283,17 +285,20 @@ scaled_df = pd.DataFrame(d, columns=names)
 scaled_df.head()
 scaled_df= scaled_df.join(df[['interest_level']].set_index(scaled_df.index))
 scaled_df
-
+'''
 ''' ------------------------------------ DATA MODELING ------------------------------------ '''
 
 '''
 df_dev, df_rest = train_test_split(scaled_df, test_size=0.3)
 df_test, df_val = train_test_split(df_rest, test_size=0.5)
 '''
-
+'''
 X = scaled_df.drop("interest_level", axis=1)
 y = scaled_df["interest_level"]
+'''
 
+X = df.drop("interest_level", axis=1)
+y = df["interest_level"]
 X_train, X_test, y_train , y_test = train_test_split(X, y, test_size=0.15)
 
 
@@ -582,6 +587,46 @@ res= gini_imp.merge(perm_imp, left_index=True, right_index=True).reset_index().\
 res.loc[len(X_train.columns)+1] = ['runtime(s)', t1-t0, t2-t1]
 
 print(res)
+
+top5_feat = res[:-1].sort_values(by=['Permutation Importance'], ascending=False).head(5)
+print('Top 5 features with higher importance:', top5_feat)
+
+
+
+'''------------------------Interpretable Machine Learning--------------------------'''
+
+
+#Function for ploting PDP 
+def ploting_pdp (f):
+  pdp_surv = pdp.pdp_isolate(model=rf, dataset=X_train, model_features=X_train.columns, feature=f, cust_grid_points=None)
+  pdp.pdp_plot(pdp_surv, 'price')
+  plt.show()
+
+
+#Function for plotting a two dimension PDP
+def two_dim_pdp(f):
+  inter= pdp.pdp_interact(model=rf, dataset=X_train, model_features=X_train.columns, features=f)
+  pdp.pdp_interact_plot(pdp_interact_out=inter, feature_names=f, plot_type='grid')   
+  plt.show()
+
+
+#Summary plot of SHAP Values
+explainer = shap.TreeExplainer(rf)
+shap_values = explainer.shap_values(X_train)
+shap.summary_plot(shap_values, X_train)
+
+#Function for forceplots
+def forceplots(row_to_show, interest_class):
+    data_for_prediction = X_train.iloc[row_to_show]
+    data_for_prediction_array = data_for_prediction.values.reshape(1, -1)
+    rf.predict_proba(data_for_prediction_array)
+    explainer = shap.TreeExplainer(rf)
+    shap_values = explainer.shap_values(data_for_prediction)
+    shap.initjs()
+    res = shap.force_plot(explainer.expected_value[interest_class], shap_values[interest_class], data_for_prediction)
+    return res
+
+
 
 
 

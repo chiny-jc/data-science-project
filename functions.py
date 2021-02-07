@@ -135,6 +135,15 @@ def shap_summary(model, train_set):
     res = shap.summary_plot(shap_values, train_set)
     return res
 
+#Dependency contribution plots
+def dependency_contribution(f, i):
+  explainer = shap.TreeExplainer(rf)  
+  shap_values = explainer.shap_values(X_train)  
+  res = shap.dependence_plot(f, shap_values[i], X_train)
+  return res
+
+
+
 #Function for forceplots
 def forceplots(row_to_show, interest_class):
     data_for_prediction = X_train.iloc[row_to_show]

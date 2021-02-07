@@ -403,7 +403,7 @@ X_test= X_test[selected_feat]
 
 '''---------------------------------RFECV Feature Selection---------------------'''
 
-
+'''
 estimator = RandomForestClassifier()
 selector = RFECV(estimator, step=1, cv=5)
 selector = selector.fit(X_train, y_train)
@@ -417,7 +417,7 @@ print(sel_feat)
 
 X_train= X_train[sel_feat]
 X_test= X_test[sel_feat]
-
+'''
 
 
 '''-------------------------------Hyperparameter Tuning the Random Forest in Python-----------------------------------------'''
@@ -594,38 +594,6 @@ print('Top 5 features with higher importance:', top5_feat)
 
 
 '''------------------------Interpretable Machine Learning--------------------------'''
-
-
-#Function for ploting PDP 
-def ploting_pdp (f):
-  pdp_surv = pdp.pdp_isolate(model=rf, dataset=X_train, model_features=X_train.columns, feature=f, cust_grid_points=None)
-  pdp.pdp_plot(pdp_surv, 'price')
-  plt.show()
-
-
-#Function for plotting a two dimension PDP
-def two_dim_pdp(f):
-  inter= pdp.pdp_interact(model=rf, dataset=X_train, model_features=X_train.columns, features=f)
-  pdp.pdp_interact_plot(pdp_interact_out=inter, feature_names=f, plot_type='grid')   
-  plt.show()
-
-
-#Summary plot of SHAP Values
-explainer = shap.TreeExplainer(rf)
-shap_values = explainer.shap_values(X_train)
-shap.summary_plot(shap_values, X_train)
-
-#Function for forceplots
-def forceplots(row_to_show, interest_class):
-    data_for_prediction = X_train.iloc[row_to_show]
-    data_for_prediction_array = data_for_prediction.values.reshape(1, -1)
-    rf.predict_proba(data_for_prediction_array)
-    explainer = shap.TreeExplainer(rf)
-    shap_values = explainer.shap_values(data_for_prediction)
-    shap.initjs()
-    res = shap.force_plot(explainer.expected_value[interest_class], shap_values[interest_class], data_for_prediction)
-    return res
-
 
 
 

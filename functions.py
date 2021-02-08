@@ -113,39 +113,39 @@ def text_cleaner(text):
 
 '''------------------------Interpretable Machine Learning--------------------------'''
 
-
-#Function for ploting PDP 
 def ploting_pdp (f):
+    ''' Function for ploting PDP '''
     pdp_surv = pdp.pdp_isolate(model=rf, dataset=X_train, model_features=X_train.columns, feature=f, cust_grid_points=None)
     pdp.pdp_plot(pdp_surv, 'price')
     plt.show()
 
 
-#Function for plotting a two dimension PDP
 def two_dim_pdp(f):
+    ''' Function for plotting a two dimension PDP'''
     inter= pdp.pdp_interact(model=rf, dataset=X_train, model_features=X_train.columns, features=f)
     pdp.pdp_interact_plot(pdp_interact_out=inter, feature_names=f, plot_type='grid')   
     plt.show()
 
 
-#Summary plot of SHAP Values
 def shap_summary(model, train_set):
+    ''' Summary plot of SHAP Values'''
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(train_set)
     res = shap.summary_plot(shap_values, train_set)
     return res
 
-#Dependency contribution plots
+
 def dependency_contribution(f, i):
-  explainer = shap.TreeExplainer(rf)  
-  shap_values = explainer.shap_values(X_train)  
-  res = shap.dependence_plot(f, shap_values[i], X_train)
-  return res
+    ''' Dependency contribution plots '''
+    explainer = shap.TreeExplainer(rf)  
+    shap_values = explainer.shap_values(X_train)  
+    res = shap.dependence_plot(f, shap_values[i], X_train)
+    return res
 
 
 
-#Function for forceplots
 def forceplots(row_to_show, interest_class):
+    ''' Functions for forceplots '''
     data_for_prediction = X_train.iloc[row_to_show]
     data_for_prediction_array = data_for_prediction.values.reshape(1, -1)
     rf.predict_proba(data_for_prediction_array)

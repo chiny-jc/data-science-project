@@ -116,7 +116,7 @@ def text_cleaner(text):
 def ploting_pdp (f):
     ''' Function for ploting PDP '''
     pdp_surv = pdp.pdp_isolate(model=rf, dataset=X_train, model_features=X_train.columns, feature=f, cust_grid_points=None)
-    pdp.pdp_plot(pdp_surv, 'price')
+    pdp.pdp_plot(pdp_surv, f)
     plt.show()
 
 
